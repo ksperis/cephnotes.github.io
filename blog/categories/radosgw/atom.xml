@@ -1,0 +1,558 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: RadosGW | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/radosgw/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Get OMAP key/value size]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/06/25/get-omap-key-slash-value-size/"/>
+    <updated>2015-06-25T16:40:15+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/06/25/get-omap-key-slash-value-size</id>
+    <content type="html"><![CDATA[<p>List the total size of all keys for each object on a pool.</p>
+
+<pre><code>object        size_keys(kB)  size_values(kB)  total(kB)  nr_keys  nr_values
+meta.log.44   0              1                1          0        10
+data_log.78   0              56419            56419      0        406841
+meta.log.36   0              1                1          0        10
+data_log.71   0              56758            56758      0        409426
+data_log.111  0              56519            56519      0        405909
+...
+</code></pre>
+
+<!--more-->
+
+
+<p>This is based on the command <code>rados listomapvals</code>.</p>
+
+<pre><code>pool='.rgw.buckets.index'
+list=`rados -p $pool ls`
+
+(
+echo "object size_keys(kB) size_values(kB) total(kB) nr_keys nr_values"
+for obj in $list; do
+echo -en "$obj ";
+rados -p $pool listomapvals $obj | awk '
+/^key: \(.* bytes\)/ { sizekey+= substr($2, 2, length($2)); nbkeys++ }
+/^value: \(.* bytes\)/ { sizevalue+= substr($2, 2, length($2)); nbvalues++ }
+END { printf("%i %i %i %i %i\n", sizekey/1024, sizevalue/1024, (sizekey+sizevalue)/1024, nbkey, nbvalues) }
+'
+done
+)
+</code></pre>
+
+<p>The method is not really optimal, so it may take some time. But it helps to have an idea.</p>
+
+<p>You can add <code>| column -t</code> at the end of the command line for better display :</p>
+
+<pre><code>object                    size_keys(kB)  size_values(kB)  total(kB)  nr_keys  nr_values
+.dir.default.1970130.1.250   8863          75592           84455      0        538692
+.dir.default.1977514.4.161   6             55              61         0        405
+.dir.default.1977550.10.98   12            83              95         0        692
+.dir.default.1977550.5.83    47            434             482        0        3074
+.dir.default.1977550.11.34   0             1               2          0        15
+.dir.default.1970130.1.69    9147          78077           87224      0        556235
+.dir.default.1977550.8.116   0             0               0          0        3
+.dir.default.1977550.3.49    0             4               5          0        36
+.dir.default.1930743.19.0    0             0               0          0        0
+.dir.default.1985483.1.40    204           1868            2073       0        13261
+.dir.default.1977514.7.77    0             8               9          0        66
+.dir.default.1977514.2.74    0             8               9          0        66
+.dir.default.1977550.8.113   0             1               2          0        15
+.dir.default.1977550.4.121   7             40              47         0        351
+.dir.default.1977514.8.122   0             0               0          0        6
+.dir.default.1985483.2.148   578           5423            6001       0        38583
+...
+</code></pre>
+
+<p><a href="http://ceph.com/docs/master/man/8/rados/#pool-specific-commands">http://ceph.com/docs/master/man/8/rados/#pool-specific-commands</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Add support of curl_multi_wait for RadosGW on Debian Wheezy]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/06/18/add-support-of-curl-multi-wait-for-radosgw-on-debian-wheezy/"/>
+    <updated>2015-06-18T17:42:39+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/06/18/add-support-of-curl-multi-wait-for-radosgw-on-debian-wheezy</id>
+    <content type="html"><![CDATA[<pre><code>WARNING: libcurl doesn't support curl_multi_wait()
+WARNING: cross zone / region transfer performance may be affected
+</code></pre>
+
+<p>If you have already been confronted to this error at startup of RadosGW, the problem is the version of libcurl used.
+To enable support of curl_multi_wait, you will need to compile radosgw with libcurl >= 7.28.0 :
+<a href="http://curl.haxx.se/libcurl/c/curl_multi_wait.html">http://curl.haxx.se/libcurl/c/curl_multi_wait.html</a></p>
+
+<!-- more -->
+
+
+<p>On debian wheezy, you can use ceph-extras repo which contains libcurl 7.29.0 to recompile ceph packages :</p>
+
+<pre><code># apt-cache policy libcurl4-gnutls-dev
+libcurl4-gnutls-dev:
+  Installed: (none)
+  Candidate: 7.26.0-1+wheezy13
+
+# echo  deb http://ceph.com/packages/ceph-extras/debian wheezy main | tee /etc/apt/sources.list.d/ceph-extras.list
+# apt-get update
+
+# apt-cache policy libcurl4-gnutls-dev
+libcurl4-gnutls-dev:
+  Installed: (none)
+  Candidate: 7.29.0-1~bpo70+1.ceph
+</code></pre>
+
+<p>Retrieve Ceph repo on Github (in this example, I use hammer version) :</p>
+
+<pre><code># apt-get install git build-essential automake
+# git clone --recursive https://github.com/ceph/ceph.git -b hammer
+# cd ceph
+</code></pre>
+
+<p>Install dependencies and build packages (without libbabeltrace-ctf-dev libbabeltrace-dev, here we not need&hellip;)</p>
+
+<pre><code># apt-get install autoconf automake autotools-dev libbz2-dev cryptsetup-bin debhelper default-jdk gdisk javahelper junit4 libaio-dev libatomic-ops-dev libblkid-dev libboost-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev libcurl4-gnutls-dev libedit-dev libexpat1-dev libfcgi-dev libfuse-dev libgoogle-perftools-dev libkeyutils-dev libleveldb-dev libnss3-dev libsnappy-dev liblttng-ust-dev libtool libudev-dev libxml2-dev parted pkg-config python-nose python-virtualenv sdparm uuid-dev uuid-runtime xfslibs-dev xfsprogs xmlstarlet yasm zlib1g-dev
+
+# dpkg-buildpackage -d
+</code></pre>
+
+<p>On RadosGW host, you will need to add &ldquo;ceph-extras&rdquo; repo (for libcurl) and install radosgw packages and dependencies :</p>
+
+<pre><code># echo  deb http://ceph.com/packages/ceph-extras/debian wheezy main | tee /etc/apt/sources.list.d/ceph-extras.list
+# apt-get update
+
+# dpkg -i ceph-common_*.deb librbd1_*.deb python-cephfs_*.deb python-rbd_*.deb librados2_*.deb python-ceph_*.deb python-rados_*.deb radosgw_*.deb
+</code></pre>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[RadosGW big index]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/05/12/radosgw-big-index/"/>
+    <updated>2015-05-12T16:16:56+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/05/12/radosgw-big-index</id>
+    <content type="html"><![CDATA[<pre><code>$ rados -p .default.rgw.buckets.index listomapkeys .dir.default.1970130.1 | wc -l
+166768275
+</code></pre>
+
+<p>With each key containing between 100 and 250 bytes, this make a very big object for rados (several GB)&hellip; Especially when migrating it from an OSD to another (this will lock all writes), moreover, the OSD containing this object will use a lot of memory &hellip;</p>
+
+<p>Since the hammer release it is possible to shard the bucket index. However, you can not shard an existing one but you can setup it for new buckets.
+This is a very good thing for the scalability.</p>
+
+<!-- more -->
+
+
+<h2>Setting up index max shards</h2>
+
+<p>You can specify the default number of shards for new buckets :</p>
+
+<ul>
+<li>Per zone, in regionmap :</li>
+</ul>
+
+
+<p>```json
+$ radosgw-admin region get
+&hellip;
+&ldquo;zones&rdquo;: [</p>
+
+<pre><code>{
+    "name": "default",
+    "endpoints": [
+        "http:\/\/storage.example.com:80\/"
+    ],
+    "log_meta": "true",
+    "log_data": "true",
+    "bucket_index_max_shards": 8             &lt;===
+},
+</code></pre>
+
+<p>&hellip;
+```</p>
+
+<ul>
+<li>In in radosgw section in ceph.conf (this override the per zone value)</li>
+</ul>
+
+
+<p><code>
+...
+[client.radosgw.gateway]
+rgw bucket index max shards = 8
+....
+</code></p>
+
+<h2>Verification :</h2>
+
+<pre><code>$ radosgw-admin metadata get bucket:mybucket | grep bucket_id
+            "bucket_id": "default.1970130.1"
+
+$ radosgw-admin metadata get bucket.instance:mybucket:default.1970130.1 | grep num_shards
+            "num_shards": 8,
+
+$ rados -p .rgw.buckets.index ls | grep default.1970130.1
+.dir.default.1970130.1.0
+.dir.default.1970130.1.1
+.dir.default.1970130.1.2
+.dir.default.1970130.1.3
+.dir.default.1970130.1.4
+.dir.default.1970130.1.5
+.dir.default.1970130.1.6
+.dir.default.1970130.1.7
+</code></pre>
+
+<h2>Bucket listing impact :</h2>
+
+<p>A simple test with ~200k objects in a bucket :</p>
+
+<table>
+<thead>
+<tr>
+<th align="left"> num_shard </th>
+<th align="left"> time (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">  0        </td>
+<td align="left"> 25</td>
+</tr>
+<tr>
+<td align="left">  8        </td>
+<td align="left"> 36</td>
+</tr>
+<tr>
+<td align="left">  128      </td>
+<td align="left"> 109</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>So, do not use buckets with thousands of shards if you do not need it, because the bucket listing will become very slow&hellip;</p>
+
+<p>Link to the blueprint :</p>
+
+<p><a href="https://wiki.ceph.com/Planning/Blueprints/Hammer/rgw%3A_bucket_index_scalability">https://wiki.ceph.com/Planning/Blueprints/Hammer/rgw%3A_bucket_index_scalability</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[RadosGW: Simple replication example]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/03/13/radosgw-simple-replication-example/"/>
+    <updated>2015-03-13T16:20:29+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/03/13/radosgw-simple-replication-example</id>
+    <content type="html"><![CDATA[<p>This is a simple example of federated gateways config to make an asynchonous replication between two Ceph clusters.</p>
+
+<p><img src="/images/simple_example_radosgw-agent.png"></p>
+
+<!-- more -->
+
+
+<p>(Update Nov. 2016 : Since Jewel version, radosgw-agent is no more needed and active-active replication between zone is now supported. See here : <a href="http://docs.ceph.com/docs/jewel/radosgw/multisite/">http://docs.ceph.com/docs/jewel/radosgw/multisite/</a>)</p>
+
+<p>( The configuration below is using radosgw-agent and is based on Ceph documentation :
+<a href="http://docs.ceph.com/docs/hammer/radosgw/federated-config/">http://docs.ceph.com/docs/hammer/radosgw/federated-config/</a> )</p>
+
+<p>Here I use only one region (&ldquo;default&rdquo;) and two zones (&ldquo;main&rdquo; and &ldquo;fallback&rdquo;), one for each cluster.</p>
+
+<p>Note that in this example, I use 3 placement targets (default, hot, cold) that correspond respectively on pool .main.rgw.buckets, .main.rgw.hot.buckets, .main.rgw.cold.buckets.
+Be carefull to replace the tags {MAIN_USER_ACCESS}, {MAIN_USER_SECRET}, {FALLBACK_USER_ACESS}, {FALLBACK_USER_SECRET} by corresponding values.</p>
+
+<p>First I created region and zones files, that will be require on the 2 clusters :</p>
+
+<p>The region file &ldquo;region.conf.json&rdquo; :</p>
+
+<p>```json
+{ &ldquo;name&rdquo;: &ldquo;default&rdquo;,
+  &ldquo;api_name&rdquo;: &ldquo;default&rdquo;,
+  &ldquo;is_master&rdquo;: &ldquo;true&rdquo;,
+  &ldquo;endpoints&rdquo;: [</p>
+
+<pre><code>    "http:\/\/s3.mydomain.com:80\/"],
+</code></pre>
+
+<p>  &ldquo;master_zone&rdquo;: &ldquo;main&rdquo;,
+  &ldquo;zones&rdquo;: [</p>
+
+<pre><code>    { "name": "main",
+      "endpoints": [
+            "http:\/\/s3.mydomain.com:80\/"],
+      "log_meta": "true",
+      "log_data": "true"},
+    { "name": "fallback",
+      "endpoints": [
+            "http:\/\/s3-fallback.mydomain.com:80\/"],
+      "log_meta": "true",
+      "log_data": "true"}],
+</code></pre>
+
+<p>  &ldquo;placement_targets&rdquo;: [</p>
+
+<pre><code>    { "name": "default-placement",
+      "tags": []},
+    { "name": "cold-placement",
+      "tags": []},
+    { "name": "hot-placement",
+      "tags": []}],
+</code></pre>
+
+<p>  &ldquo;default_placement&rdquo;: &ldquo;default-placement&rdquo;}
+```</p>
+
+<p>a zone file &ldquo;zone-main.conf.json&rdquo; :</p>
+
+<p>```json
+{ &ldquo;domain_root&rdquo;: &ldquo;.main.domain.rgw&rdquo;,
+  &ldquo;control_pool&rdquo;: &ldquo;.main.rgw.control&rdquo;,
+  &ldquo;gc_pool&rdquo;: &ldquo;.main.rgw.gc&rdquo;,
+  &ldquo;log_pool&rdquo;: &ldquo;.main.log&rdquo;,
+  &ldquo;intent_log_pool&rdquo;: &ldquo;.main.intent-log&rdquo;,
+  &ldquo;usage_log_pool&rdquo;: &ldquo;.main.usage&rdquo;,
+  &ldquo;user_keys_pool&rdquo;: &ldquo;.main.users&rdquo;,
+  &ldquo;user_email_pool&rdquo;: &ldquo;.main.users.email&rdquo;,
+  &ldquo;user_swift_pool&rdquo;: &ldquo;.main.users.swift&rdquo;,
+  &ldquo;user_uid_pool&rdquo;: &ldquo;.main.users.uid&rdquo;,
+  &ldquo;system_key&rdquo;: {</p>
+
+<pre><code>  "access_key": "{MAIN_USER_ACCESS}",
+  "secret_key": "{MAIN_USER_SECRET}"},
+</code></pre>
+
+<p>  &ldquo;placement_pools&rdquo;: [</p>
+
+<pre><code>    { "key": "default-placement",
+      "val": { "index_pool": ".main.rgw.buckets.index",
+          "data_pool": ".main.rgw.buckets",
+          "data_extra_pool": ".main.rgw.buckets.extra"}},
+    { "key": "cold-placement",
+      "val": { "index_pool": ".main.rgw.buckets.index",
+          "data_pool": ".main.rgw.cold.buckets",
+          "data_extra_pool": ".main.rgw.buckets.extra"}},
+    { "key": "hot-placement",
+      "val": { "index_pool": ".main.rgw.buckets.index",
+          "data_pool": ".main.rgw.hot.buckets",
+          "data_extra_pool": ".main.rgw.buckets.extra"}}]}
+</code></pre>
+
+<p>```</p>
+
+<p>And a zone file &ldquo;zone-fallback.conf.json&rdquo; :</p>
+
+<p>```json
+{ &ldquo;domain_root&rdquo;: &ldquo;.fallback.domain.rgw&rdquo;,
+  &ldquo;control_pool&rdquo;: &ldquo;.fallback.rgw.control&rdquo;,
+  &ldquo;gc_pool&rdquo;: &ldquo;.fallback.rgw.gc&rdquo;,
+  &ldquo;log_pool&rdquo;: &ldquo;.fallback.log&rdquo;,
+  &ldquo;intent_log_pool&rdquo;: &ldquo;.fallback.intent-log&rdquo;,
+  &ldquo;usage_log_pool&rdquo;: &ldquo;.fallback.usage&rdquo;,
+  &ldquo;user_keys_pool&rdquo;: &ldquo;.fallback.users&rdquo;,
+  &ldquo;user_email_pool&rdquo;: &ldquo;.fallback.users.email&rdquo;,
+  &ldquo;user_swift_pool&rdquo;: &ldquo;.fallback.users.swift&rdquo;,
+  &ldquo;user_uid_pool&rdquo;: &ldquo;.fallback.users.uid&rdquo;,
+  &ldquo;system_key&rdquo;: {</p>
+
+<pre><code>"access_key": "{FALLBACK_USER_ACESS}",
+"secret_key": "{FALLBACK_USER_SECRET}"
+     },
+</code></pre>
+
+<p>  &ldquo;placement_pools&rdquo;: [</p>
+
+<pre><code>    { "key": "default-placement",
+      "val": { "index_pool": ".fallback.rgw.buckets.index",
+          "data_pool": ".fallback.rgw.buckets",
+          "data_extra_pool": ".fallback.rgw.buckets.extra"}},
+    { "key": "cold-placement",
+      "val": { "index_pool": ".fallback.rgw.buckets.index",
+          "data_pool": ".fallback.rgw.cold.buckets",
+          "data_extra_pool": ".fallback.rgw.buckets.extra"}},
+    { "key": "hot-placement",
+      "val": { "index_pool": ".fallback.rgw.buckets.index",
+          "data_pool": ".fallback.rgw.hot.buckets",
+          "data_extra_pool": ".fallback.rgw.buckets.extra"}}]}
+</code></pre>
+
+<p>```</p>
+
+<h2>On first cluster (MAIN)</h2>
+
+<p>I created the pools :</p>
+
+<p>```bash</p>
+
+<pre><code>ceph osd pool create .rgw.root 16 16
+ceph osd pool create .main.rgw.root 16 16
+ceph osd pool create .main.domain.rgw 16 16
+ceph osd pool create .main.rgw.control 16 16
+ceph osd pool create .main.rgw.gc 16 16
+ceph osd pool create .main.rgw.buckets 512 512
+ceph osd pool create .main.rgw.hot.buckets 512 512
+ceph osd pool create .main.rgw.cold.buckets 512 512
+ceph osd pool create .main.rgw.buckets.index 32 32
+ceph osd pool create .main.rgw.buckets.extra 16 16
+ceph osd pool create .main.log 16 16
+ceph osd pool create .main.intent-log 16 16
+ceph osd pool create .main.usage 16 16
+ceph osd pool create .main.users 16 16
+ceph osd pool create .main.users.email 16 16
+ceph osd pool create .main.users.swift 16 16
+ceph osd pool create .main.users.uid 16 16
+</code></pre>
+
+<p>```</p>
+
+<p>I configured region, zone, and add system users :</p>
+
+<p>```bash
+  radosgw-admin region set &mdash;name client.radosgw.main &lt; region.conf.json
+  radosgw-admin zone set &mdash;rgw-zone=main &mdash;name client.radosgw.main &lt; zone-main.conf.json
+  radosgw-admin zone set &mdash;rgw-zone=fallback &mdash;name client.radosgw.main &lt; zone-fallback.conf.json
+  radosgw-admin regionmap update &mdash;name client.radosgw.main</p>
+
+<p>  radosgw-admin user create &mdash;uid=&ldquo;main&rdquo; &mdash;display-name=&ldquo;Zone main&rdquo; &mdash;name client.radosgw.main &mdash;system &mdash;access-key={MAIN_USER_ACCESS} &mdash;secret={MAIN_USER_SECRET}
+  radosgw-admin user create &mdash;uid=&ldquo;fallback&rdquo; &mdash;display-name=&ldquo;Zone fallback&rdquo; &mdash;name client.radosgw.main &mdash;system &mdash;access-key={FALLBACK_USER_ACESS} &mdash;secret={FALLBACK_USER_SECRET}
+```</p>
+
+<p>Setup RadosGW Config in ceph.conf on cluster MAIN :</p>
+
+<p><code>
+  [client.radosgw.main]
+  host = ceph-main-radosgw-01
+  rgw region = default
+  rgw region root pool = .rgw.root
+  rgw zone = main
+  rgw zone root pool = .main.rgw.root
+  rgw frontends = "civetweb port=80"
+  rgw dns name = s3.mydomain.com
+  keyring = /etc/ceph/ceph.client.radosgw.keyring
+  rgw_socket_path = /var/run/ceph/radosgw.sock
+</code>
+I needed to create keyring for [client.radosgw.main] in /etc/ceph/ceph.client.radosgw.keyring, see documentation.</p>
+
+<p>Then, start/restart radosgw for cluster MAIN.</p>
+
+<h2>On the other Ceph cluster (FALLBACK)</h2>
+
+<p>I created the pools :</p>
+
+<p>```bash</p>
+
+<pre><code>ceph osd pool create .rgw.root 16 16
+ceph osd pool create .fallback.rgw.root 16 16
+ceph osd pool create .fallback.domain.rgw 16 16
+ceph osd pool create .fallback.rgw.control 16 16
+ceph osd pool create .fallback.rgw.gc 16 16
+ceph osd pool create .fallback.rgw.buckets 512 512
+ceph osd pool create .fallback.rgw.hot.buckets 512 512
+ceph osd pool create .fallback.rgw.cold.buckets 512 512
+ceph osd pool create .fallback.rgw.buckets.index 32 32
+ceph osd pool create .fallback.rgw.buckets.extra 16 16
+ceph osd pool create .fallback.log 16 16
+ceph osd pool create .fallback.intent-log 16 16
+ceph osd pool create .fallback.usage 16 16
+ceph osd pool create .fallback.users 16 16
+ceph osd pool create .fallback.users.email 16 16
+ceph osd pool create .fallback.users.swift 16 16
+ceph osd pool create .fallback.users.uid 16 16
+</code></pre>
+
+<p>```</p>
+
+<p>I configured region, zone, and add system users :</p>
+
+<pre><code>radosgw-admin region set --name client.radosgw.fallback &lt; region.conf.json
+radosgw-admin zone set --rgw-zone=fallback --name client.radosgw.fallback &lt; zone-fallback.conf.json
+radosgw-admin zone set --rgw-zone=main --name client.radosgw.fallback &lt; zone-main.conf.json
+radosgw-admin regionmap update --name client.radosgw.fallback
+
+radosgw-admin user create --uid="fallback" --display-name="Zone fallback" --name client.radosgw.fallback --system --access-key={FALLBACK_USER_ACESS} --secret={FALLBACK_USER_SECRET}
+radosgw-admin user create --uid="main" --display-name="Zone main" --name client.radosgw.fallback --system --access-key={MAIN_USER_ACCESS} --secret={MAIN_USER_SECRET}
+</code></pre>
+
+<p>Setup RadosGW Config in ceph.conf on cluster FALLBACK :</p>
+
+<p>```</p>
+
+<pre><code>[client.radosgw.fallback]
+host = ceph-fallback-radosgw-01
+rgw region = default
+rgw region root pool = .rgw.root
+rgw zone = fallback
+rgw zone root pool = .fallback.rgw.root
+rgw frontends = "civetweb port=80"
+rgw dns name = s3-fallback.mydomain.com
+keyring = /etc/ceph/ceph.client.radosgw.keyring
+rgw_socket_path = /var/run/ceph/radosgw.sock
+</code></pre>
+
+<p>```
+Also, I needed to create keyring for [client.radosgw.fallback] in /etc/ceph/ceph.client.radosgw.keyring and start radosgw for cluster FALLBACK.</p>
+
+<h2>Finally setup the RadosGW Agent</h2>
+
+<p>/etc/ceph/radosgw-agent/default.conf :</p>
+
+<p>```</p>
+
+<pre><code>src_zone: main
+source: http://s3.mydomain.com:80
+src_access_key: {MAIN_USER_ACCESS}
+src_secret_key: {MAIN_USER_SECRET}
+dest_zone: fallback
+destination: http://s3-fallback.mydomain.com:80
+dest_access_key: {FALLBACK_USER_ACESS}
+dest_secret_key: {FALLBACK_USER_SECRET}
+log_file: /var/log/radosgw/radosgw-sync.log
+</code></pre>
+
+<p>```</p>
+
+<p>```bash</p>
+
+<pre><code>/etc/init.d/radosgw-agent start
+</code></pre>
+
+<p>```</p>
+
+<p>After that, he still has a little suspense &hellip;
+Then I try to create a bucket with data on s3.mydomain.com and verify that, it&rsquo;s well synchronized.</p>
+
+<p>for debug, you can enable logs on the RadosGW on each side, and start radosgw-agent with radosgw-agent -v -c /etc/ceph/radosgw-agent/default.conf</p>
+
+<p>These steps work for me. The establishment is sometimes not obvious. Whenever I setup a sync it rarely works the first time, but it always ends up running.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Replace Apache by Civetweb on the RadosGW]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/01/27/replace-apache-by-civetweb-on-the-radosgw/"/>
+    <updated>2015-01-27T09:43:19+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/01/27/replace-apache-by-civetweb-on-the-radosgw</id>
+    <content type="html"><![CDATA[<p>Since Firefly you can test the use of the lightweight web client Civetweb instead of Apache.
+To activate it, it&rsquo;s very simple, there&rsquo;s nothing to install again, simply add this line to your ceph.conf:</p>
+
+<pre><code>[client.radosgw.gateway]
+rgw frontends = "civetweb port=80"
+...
+</code></pre>
+
+<p>If you have already installed apache, remember to stop it before activating civetweb, or it must not listen on the same port.</p>
+
+<p>Then :</p>
+
+<pre><code>/etc/init.d/radosgw restart
+</code></pre>
+]]></content>
+  </entry>
+  
+</feed>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Journal | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/journal/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Ceph Journal Migration]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2014/06/29/ceph-journal-migration/"/>
+    <updated>2014-06-29T15:55:42+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2014/06/29/ceph-journal-migration</id>
+    <content type="html"><![CDATA[<p>An exemple for migrating journal from file on the default location to a dedicated partition on /dev/sde1.</p>
+
+<!-- more -->
+
+
+<pre><code>$ apt-get install hdparm
+
+### Stop osd
+$ service ceph stop osd.0
+
+### Flush Journal
+$ ceph-osd --flush-journal -i 0
+
+### Create symlink to partition
+$ rm /var/lib/ceph/osd/ceph-0/journal
+$ ln -s /dev/sde1 /var/lib/ceph/osd/ceph-0/journal
+
+### Create new journal
+$ ceph-osd --mkjournal -i 0
+$ service ceph start osd.0
+</code></pre>
+]]></content>
+  </entry>
+  
+</feed>

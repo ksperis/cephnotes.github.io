@@ -1,0 +1,608 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>OpenNebula 4.8 With Ceph Support on Debian Wheezy - CephNotes</title>
+  <meta name="author" content="Laurent Barbe">
+
+  
+  <meta name="description" content="A quick howto to install OpenNebula 4.8 with support for Ceph on Debian Wheezy. 1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+$ onedatastore show cephds
+DATASTORE 101 &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://cephnotes.ksperis.com/blog/2014/11/14/opennebula-4-dot-8-with-ceph-support-on-debian-wheezy">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="CephNotes" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="/stylesheets/tables.css" media="screen, projection" rel="stylesheet" type="text/css" />
+
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-42826829-2']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">CephNotes</a></h1>
+  
+    <h2><h2>Some notes about Ceph<br>Laurent Barbe @CCM Benchmark</h2></h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="as_sitesearch" value="cephnotes.ksperis.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">OpenNebula 4.8 With Ceph Support on Debian Wheezy</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2014-11-14T16:57:10+01:00" pubdate data-updated="true" class="updated">Nov 14<span>th</span>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>A quick howto to install OpenNebula 4.8 with support for Ceph on Debian Wheezy.</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>onedatastore show cephds
+</span><span class='line'>DATASTORE 101 INFORMATION
+</span><span class='line'>ID             : 101
+</span><span class='line'>NAME           : cephds
+</span><span class='line'>USER           : oneadmin
+</span><span class='line'>GROUP          : oneadmin
+</span><span class='line'>CLUSTER        : -
+</span><span class='line'>TYPE           : IMAGE
+</span><span class='line'>DS_MAD         : ceph
+</span><span class='line'>TM_MAD         : ceph
+</span><span class='line'>BASE PATH      : /var/lib/one//datastores/101
+</span><span class='line'>DISK_TYPE      : RBD
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<!-- more -->
+
+
+<h1>OpenNebula Installation</h1>
+
+<h2>OpenNebula Frontend</h2>
+
+<p>Install OpenNebula repo</p>
+
+<pre><code>wget -q -O- http://downloads.opennebula.org/repo/Ubuntu/repo.key | apt-key add -
+echo "deb http://downloads.opennebula.org/repo/4.8/Debian/7/ stable opennebula" &gt; /etc/apt/sources.list.d/opennebula.list
+</code></pre>
+
+<p>Download packages</p>
+
+<pre><code>apt-get update
+apt-get install opennebula opennebula-sunstone nfs-kernel-server
+</code></pre>
+
+<p>Configure and start the service</p>
+
+<pre><code>sed -i -e 's/:host: 127.0.0.1/:host: 0.0.0.0/g' /etc/one/sunstone-server.conf
+/etc/init.d/opennebula-sunstone restart
+</code></pre>
+
+<p>Export NFS</p>
+
+<pre><code>echo "/var/lib/one/ *(rw,sync,no_subtree_check,root_squash)" &gt;&gt; /etc/exports
+service nfs-kernel-server restart
+</code></pre>
+
+<p>Configure SSH Public Key</p>
+
+<pre><code>su - oneadmin
+$ cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+
+
+$ cat &lt;&lt; EOT &gt; ~/.ssh/config
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+EOT
+$ chmod 600 ~/.ssh/config
+</code></pre>
+
+<h2>OpenNebula Compute Nodes</h2>
+
+<p>Install OpenNebula repo</p>
+
+<pre><code>wget -q -O- http://downloads.opennebula.org/repo/Ubuntu/repo.key | apt-key add -
+echo "deb http://downloads.opennebula.org/repo/4.8/Debian/7/ stable opennebula" &gt; /etc/apt/sources.list.d/opennebula.list
+</code></pre>
+
+<p>Download packages</p>
+
+<pre><code>apt-get update
+apt-get install opennebula-node nfs-common bridge-utils
+</code></pre>
+
+<p>Network config</p>
+
+<pre><code>vim /etc/network/interfaces
+    ...
+    bridge_ports eth0
+    bridge_fd 9
+    bridge_hello 2
+    bridge_maxage 12
+    bridge_stp off
+</code></pre>
+
+<p>Fstab</p>
+
+<pre><code>vim /etc/fstab
+10.2.0.130:/var/lib/one/  /var/lib/one/  nfs   soft,intr,rsize=8192,wsize=8192,noauto
+mount /var/lib/one/
+</code></pre>
+
+<p>Qemu config</p>
+
+<pre><code>cat &lt;&lt; EOT &gt; /etc/libvirt/qemu.conf
+user  = "oneadmin"
+group = "oneadmin"
+dynamic_ownership = 0
+EOT
+</code></pre>
+
+<h1>Ceph configuration</h1>
+
+<p>I suppose that you have already a Ceph cluster running.</p>
+
+<p>Now create a pool &ldquo;one&rdquo; for Opennebula and create auth key.</p>
+
+<pre><code>ceph osd pool create one 128 128
+ceph osd pool set one crush_ruleset 2
+ceph auth get-or-create client.one mon 'allow r' osd 'allow rwx pool=one'
+[client.one]
+    key = AQCfTjVUeOPqIhAAiCAiBIgYd85fuMFT0dXVpA==
+</code></pre>
+
+<h2>Add Ceph firefly for support rbd on libvirt + qemu</h2>
+
+<p>Before, you need compile rbd support for libvirt and qemu. You can have a look to this post : <a href="http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy">http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy</a> (If you do not want to compile qemu you can directluy download those packages here : <a href="http://ksperis.com/files/qemu-kvm_1.1.2+dfsg-6_amd64.deb,">http://ksperis.com/files/qemu-kvm_1.1.2+dfsg-6_amd64.deb,</a> <a href="http://ksperis.com/files/qemu-kvm_1.1.2+dfsg-6_amd64.deb">http://ksperis.com/files/qemu-kvm_1.1.2+dfsg-6_amd64.deb</a>)</p>
+
+<p>On each node, add Ceph firefly repo, and reinstall libvirt and qemu packages</p>
+
+<pre><code>apt-get install lsb-release
+wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
+echo deb http://ceph.com/debian-firefly/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
+apt-get update
+apt-get install librados2 librbd1
+
+dpkg -i qemu-kvm_1.1.2+dfsg-6+deb7u4_amd64.deb qemu-utils_1.1.2+dfsg-6a+deb7u4_amd64.deb
+</code></pre>
+
+<p>Create the secret for libvirt :</p>
+
+<pre><code>echo "
+&lt;secret ephemeral='no' private='no'&gt;
+   &lt;usage type='ceph'&gt;
+     &lt;name&gt;client.one secret&lt;/name&gt;
+   &lt;/usage&gt;
+&lt;/secret&gt;" &gt; secret.xml
+
+
+service libvirt reload
+</code></pre>
+
+<p>Add ceph datastore on OpenNebula</p>
+
+<pre><code>$ su - oneadmin
+$ vim ceph.one
+NAME         = cephds
+DS_MAD       = ceph
+TM_MAD       = ceph
+DISK_TYPE    = RBD
+POOL_NAME    = one
+BRIDGE_LIST  ="onenode1 onenode2 onenode3"
+CEPH_HOST    ="192.168.0.1:6789 192.168.0.2:6789 192.168.0.3:6789"
+CEPH_SECRET  ="26a8b4d7-eb24-bf85-396d-fbf0x252e402"
+CEPH_USER    ="one"
+
+$ onedatastore create ceph.one
+ID: 101
+</code></pre>
+
+<p>Example config :</p>
+
+<pre><code>$ onedatastore show cephds
+DATASTORE 101 INFORMATION                                                       
+ID             : 101                 
+NAME           : cephds              
+USER           : oneadmin            
+GROUP          : oneadmin            
+CLUSTER        : -                   
+TYPE           : IMAGE               
+DS_MAD         : ceph                
+TM_MAD         : ceph                
+BASE PATH      : /var/lib/one//datastores/101
+DISK_TYPE      : RBD                 
+
+DATASTORE CAPACITY                                                              
+TOTAL:         : 15.9T               
+FREE:          : 13.4T               
+USED:          : 2.5T                
+LIMIT:         : -                   
+
+PERMISSIONS                                                                     
+OWNER          : um-                 
+GROUP          : u--                 
+OTHER          : ---                 
+
+DATASTORE TEMPLATE                                                              
+BASE_PATH="/var/lib/one//datastores/"
+BRIDGE_LIST="onenode1 onenode2 onenode3"
+CEPH_HOST="192.168.0.1:6789 192.168.0.2:6789 192.168.0.3:6789"
+CEPH_SECRET="26a8b4d7-eb24-bf85-396d-fbf0x252e402"
+CEPH_USER="one"
+CLONE_TARGET="SELF"
+DISK_TYPE="RBD"
+DS_MAD="ceph"
+LN_TARGET="NONE"
+POOL_NAME="one"
+TM_MAD="ceph"
+TYPE="IMAGE_DS"
+
+IMAGES         
+9              
+10             
+11             
+12             
+16             
+21             
+24             
+27             
+28             
+29             
+31             
+32             
+</code></pre>
+
+<p>Try import image in new datastore :</p>
+
+<pre><code>$ oneimage create
+    --name "CentOS-6.5_x86_64"
+    --path "http://appliances.c12g.com/CentOS-6.5/centos6.5.qcow2.gz"
+    --driver qcow2
+    --datastore cephds
+</code></pre>
+
+<p>Datastore view in Sunstone :</p>
+
+<p><img src="/images/img018.png"></p>
+
+<p>More details here :</p>
+
+<p><a href="http://ceph.com/community/ceph-support-in-opennebula-4-0/">http://ceph.com/community/ceph-support-in-opennebula-4-0/</a></p>
+
+<p><a href="http://archives.opennebula.org/documentation:archives:rel4.0:ceph_ds">http://archives.opennebula.org/documentation:archives:rel4.0:ceph_ds</a></p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Laurent Barbe</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2014-11-14T16:57:10+01:00" pubdate data-updated="true" class="updated">Nov 14<span>th</span>, 2014</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/opennebula/'>OpenNebula</a>, <a class='category' href='/blog/categories/librbd/'>librbd</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="//twitter.com/share" class="twitter-share-button" data-url="http://cephnotes.ksperis.com/blog/2014/11/14/opennebula-4-dot-8-with-ceph-support-on-debian-wheezy/" data-via="ksperis" data-counturl="http://cephnotes.ksperis.com/blog/2014/11/14/opennebula-4-dot-8-with-ceph-support-on-debian-wheezy/" >Tweet</a>
+  
+  
+  <div class="g-plusone" data-size="medium"></div>
+  
+  
+    <div class="fb-like" data-send="true" data-width="450" data-show-faces="false"></div>
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/10/29/remove-pool-without-name/" title="Previous Post: Remove pool without name">&laquo; Remove pool without name</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2014/11/17/ceph-rbd-with-lxc-containers/" title="Next Post: Ceph RBD with LXC containers">Ceph RBD with LXC containers &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2017/07/28/how-many-mouvement-when-i-add-a-replica/">How Many Mouvement When I Add a Replica ?</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/03/03/dealing-with-some-osd-timeouts/">Dealing With Some Osd Timeouts</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/27/erasure-code-on-small-clusters/">Erasure Code on Small Clusters</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/23/crushmap-for-2-dc/">Crushmap for 2 DC</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/20/change-log-level-on-the-fly-to-ceph-daemons/">Change Log Level on the Fly to Ceph Daemons</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/06/main-new-features-in-the-latest-versions-of-ceph/">Main New Features in the Latest Versions of Ceph</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/05/26/check-osd-version/">Check OSD Version</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/05/24/find-the-osd-location/">Find the OSD Location</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd/">LXC 2.0.0 First Support for Ceph RBD</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/08/13/downgrade-lsi-9207-to-p19-firmware/">Downgrade LSI 9207 to P19 Firmware</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/25/get-omap-key-slash-value-size/">Get OMAP Key/value Size</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/22/the-kernel-4-dot-1-is-out/">The Kernel 4.1 Is Out</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/18/add-support-of-curl-multi-wait-for-radosgw-on-debian-wheezy/">Add Support of Curl_multi_wait for RadosGW on Debian Wheezy</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/19/intel-520-ssd-journal/">Intel 520 SSD Journal</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/12/radosgw-big-index/">RadosGW Big Index</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/ksperis">@ksperis</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'ksperis',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2017 - Laurent Barbe -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'cephnotes';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://cephnotes.ksperis.com/blog/2014/11/14/opennebula-4-dot-8-with-ceph-support-on-debian-wheezy/';
+        var disqus_url = 'http://cephnotes.ksperis.com/blog/2014/11/14/opennebula-4-dot-8-with-ceph-support-on-debian-wheezy/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id; js.async = true;
+  js.src = "//connect.facebook.net/en_US/all.js#appId=212934732101925&xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+
+
+
+  <script type="text/javascript">
+    (function() {
+      var script = document.createElement('script'); script.type = 'text/javascript'; script.async = true;
+      script.src = 'https://apis.google.com/js/plusone.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(script, s);
+    })();
+  </script>
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = '//platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

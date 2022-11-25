@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: PG | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/pg/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[get the number of placement groups per osd]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/"/>
+    <updated>2015-02-23T17:53:51+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd</id>
+    <content type="html"><![CDATA[<p>Get the PG distribution per osd in command line :</p>
+
+<pre><code>pool :  0   1   2   3   | SUM 
+------------------------------------------------
+osd.10  6   6   6   84  | 102
+osd.11  7   6   6   76  | 95
+osd.12  4   4   3   56  | 67
+osd.20  5   5   5   107 | 122
+osd.13  3   3   3   73  | 82
+osd.21  9   10  10  110 | 139
+osd.14  3   3   3   85  | 94
+osd.15  6   6   6   87  | 105
+osd.22  6   6   5   87  | 104
+osd.23  10  10  10  87  | 117
+osd.16  7   7   7   102 | 123
+osd.17  5   5   5   99  | 114
+osd.18  4   4   4   103 | 115
+osd.19  7   7   7   112 | 133
+osd.0   5   5   5   72  | 87
+osd.1   5   5   6   83  | 99
+osd.2   3   3   3   74  | 83
+osd.3   5   5   5   61  | 76
+osd.4   3   3   4   76  | 86
+osd.5   5   5   5   78  | 93
+osd.6   3   2   2   78  | 85
+osd.7   3   3   3   88  | 97
+osd.8   9   9   9   91  | 118
+osd.9   5   6   6   79  | 96
+------------------------------------------------
+SUM :   128 128 128 2048    |
+</code></pre>
+
+<!--more-->
+
+
+<p>The command :</p>
+
+<p><code>
+ceph pg dump | awk '
+BEGIN { IGNORECASE = 1 }
+ /^PG_STAT/ { col=1; while($col!="UP") {col++}; col++ }
+ /^[0-9a-f]+\.[0-9a-f]+/ { match($0,/^[0-9a-f]+/); pool=substr($0, RSTART, RLENGTH); poollist[pool]=0;
+ up=$col; i=0; RSTART=0; RLENGTH=0; delete osds; while(match(up,/[0-9]+/)&gt;0) { osds[++i]=substr(up,RSTART,RLENGTH); up = substr(up, RSTART+RLENGTH) }
+ for(i in osds) {array[osds[i],pool]++; osdlist[osds[i]];}
+}
+END {
+ printf("\n");
+ printf("pool :\t"); for (i in poollist) printf("%s\t",i); printf("| SUM \n");
+ for (i in poollist) printf("--------"); printf("----------------\n");
+ for (i in osdlist) { printf("osd.%i\t", i); sum=0;
+   for (j in poollist) { printf("%i\t", array[i,j]); sum+=array[i,j]; sumpool[j]+=array[i,j] }; printf("| %i\n",sum) }
+ for (i in poollist) printf("--------"); printf("----------------\n");
+ printf("SUM :\t"); for (i in poollist) printf("%s\t",sumpool[i]); printf("|\n");
+}'
+</code></p>
+
+<p>Copy-paste should work directly.
+The sum at bottom of the table must match to (pg_num x size).</p>
+
+<p>You can find pg_num recommandations here :
+<a href="http://ceph.com/docs/master/rados/operations/placement-groups/">http://ceph.com/docs/master/rados/operations/placement-groups/</a></p>
+
+<p>Also, a pg_num Calculator is avaible here :
+<a href="http://ceph.com/pgcalc">http://ceph.com/pgcalc</a></p>
+
+<p>To view the number of pg per osd :
+<a href="http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/">http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/</a></p>
+]]></content>
+  </entry>
+  
+</feed>

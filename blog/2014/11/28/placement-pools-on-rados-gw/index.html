@@ -1,0 +1,638 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Placement_pools on Rados-GW - CephNotes</title>
+  <meta name="author" content="Laurent Barbe">
+
+  
+  <meta name="description" content="The purpose of this test is to map a RadosGw Bucket to a specific Ceph pool. For exemple, if using a fast pool with ssd and a low pool for archive& &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://cephnotes.ksperis.com/blog/2014/11/28/placement-pools-on-rados-gw">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="CephNotes" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="/stylesheets/tables.css" media="screen, projection" rel="stylesheet" type="text/css" />
+
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-42826829-2']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">CephNotes</a></h1>
+  
+    <h2><h2>Some notes about Ceph<br>Laurent Barbe @CCM Benchmark</h2></h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="as_sitesearch" value="cephnotes.ksperis.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Placement_pools on Rados-GW</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2014-11-28T22:41:04+01:00" pubdate data-updated="true" class="updated">Nov 28<span>th</span>, 2014</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>The purpose of this test is to map a RadosGw Bucket to a specific Ceph pool. For exemple, if using a fast pool with ssd and a low pool for archive&hellip;</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>   standard_bucket datas  --&gt; .rgw.buckets        (default pool)
+</span><span class='line'>   specific_bucket datas  --&gt; .rgw.buckets.custom</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<!-- more -->
+
+
+<p>First, we create a pool .rgw.buckets.custom, with, for example, some specific parameters (different size and different ruleset in crushmap) :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>ceph osd pool create .rgw.buckets.custom 64 64
+</span><span class='line'>pool <span class="s1">&#39;.rgw.buckets.custom&#39;</span> created
+</span><span class='line'>
+</span><span class='line'><span class="nv">$ </span>ceph osd pool <span class="nb">set</span> .rgw.buckets.custom size 2
+</span><span class='line'><span class="nb">set </span>pool 59 size to 2
+</span><span class='line'>
+</span><span class='line'><span class="nv">$ </span>ceph osd pool <span class="nb">set</span> .rgw.buckets.custom crush_ruleset 6
+</span><span class='line'><span class="nb">set </span>pool 59 crush_ruleset to 6
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Then, we need to configure a specific placement_targets in region map and zone.
+For next step, you need to have a running config of rados-gw&hellip;</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>radosgw-admin region get &gt; region.conf.json
+</span><span class='line'><span class="nv">$ </span>vim region.conf.json            <span class="c"># Add an entry in placement_targets</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='json'><span class='line'><span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;api_name&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;is_master&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[],</span>
+</span><span class='line'>  <span class="nt">&quot;master_zone&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;zones&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[],</span>
+</span><span class='line'>          <span class="nt">&quot;log_meta&quot;</span><span class="p">:</span> <span class="s2">&quot;false&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;log_data&quot;</span><span class="p">:</span> <span class="s2">&quot;false&quot;</span><span class="p">}],</span>
+</span><span class='line'>  <span class="nt">&quot;placement_targets&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;default-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;custom-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[]}],</span>
+</span><span class='line'>  <span class="nt">&quot;default_placement&quot;</span><span class="p">:</span> <span class="s2">&quot;default-placement&quot;</span><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>radosgw-admin region <span class="nb">set</span> &lt; region.conf.json
+</span><span class='line'>....
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>radosgw-admin zone get &gt; zone.conf.json
+</span><span class='line'><span class="nv">$ </span>vim zone.conf.json            <span class="c"># Add an entry in placement_pools with key &quot;custom-placement&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class='json'><span class='line'><span class="p">{</span> <span class="nt">&quot;domain_root&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;control_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw.control&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;gc_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw.gc&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.log&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;intent_log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.intent-log&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;usage_log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.usage&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_keys_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.users&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_email_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.users.email&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_swift_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.users.swift&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_uid_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.users.uid&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;system_key&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;access_key&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span class='line'>      <span class="nt">&quot;secret_key&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">},</span>
+</span><span class='line'>  <span class="nt">&quot;placement_pools&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;default-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;val&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;index_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw.buckets.index&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw.buckets&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_extra_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw.buckets.extra&quot;</span><span class="p">}},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;custom-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;val&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;index_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw.buckets.index&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw.buckets.custom&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_extra_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.rgw.buckets.extra&quot;</span><span class="p">}}]}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>radosgw-admin zone <span class="nb">set</span> &lt;zone.conf.json
+</span><span class='line'>2014-11-25 18:03:23.894153 7f728c0f2780  0 couldn<span class="err">&#39;</span>t find old data placement pools config, setting up new ones <span class="k">for </span>the zone
+</span><span class='line'>.....
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>radosgw-admin regionmap update
+</span><span class='line'><span class="o">{</span> <span class="s2">&quot;regions&quot;</span>: <span class="o">[</span>
+</span><span class='line'>        <span class="o">{</span> <span class="s2">&quot;key&quot;</span>: <span class="s2">&quot;default&quot;</span>,
+</span><span class='line'>          <span class="s2">&quot;val&quot;</span>: <span class="o">{</span> <span class="s2">&quot;name&quot;</span>: <span class="s2">&quot;default&quot;</span>,
+</span><span class='line'>              <span class="s2">&quot;api_name&quot;</span>: <span class="s2">&quot;&quot;</span>,
+</span><span class='line'>              <span class="s2">&quot;is_master&quot;</span>: <span class="s2">&quot;true&quot;</span>,
+</span><span class='line'>              <span class="s2">&quot;endpoints&quot;</span>: <span class="o">[]</span>,
+</span><span class='line'>              <span class="s2">&quot;master_zone&quot;</span>: <span class="s2">&quot;&quot;</span>,
+</span><span class='line'>              <span class="s2">&quot;zones&quot;</span>: <span class="o">[</span>
+</span><span class='line'>                    <span class="o">{</span> <span class="s2">&quot;name&quot;</span>: <span class="s2">&quot;default&quot;</span>,
+</span><span class='line'>                      <span class="s2">&quot;endpoints&quot;</span>: <span class="o">[]</span>,
+</span><span class='line'>                      <span class="s2">&quot;log_meta&quot;</span>: <span class="s2">&quot;false&quot;</span>,
+</span><span class='line'>                      <span class="s2">&quot;log_data&quot;</span>: <span class="s2">&quot;false&quot;</span><span class="o">}]</span>,
+</span><span class='line'>              <span class="s2">&quot;placement_targets&quot;</span>: <span class="o">[</span>
+</span><span class='line'>                    <span class="o">{</span> <span class="s2">&quot;name&quot;</span>: <span class="s2">&quot;custom-placement&quot;</span>,
+</span><span class='line'>                      <span class="s2">&quot;tags&quot;</span>: <span class="o">[]}</span>,
+</span><span class='line'>                    <span class="o">{</span> <span class="s2">&quot;name&quot;</span>: <span class="s2">&quot;default-placement&quot;</span>,
+</span><span class='line'>                      <span class="s2">&quot;tags&quot;</span>: <span class="o">[]}]</span>,
+</span><span class='line'>              <span class="s2">&quot;default_placement&quot;</span>: <span class="s2">&quot;default-placement&quot;</span><span class="o">}}]</span>,
+</span><span class='line'>  <span class="s2">&quot;master_region&quot;</span>: <span class="s2">&quot;default&quot;</span>,
+</span><span class='line'>  <span class="s2">&quot;bucket_quota&quot;</span>: <span class="o">{</span> <span class="s2">&quot;enabled&quot;</span>: <span class="nb">false</span>,
+</span><span class='line'>      <span class="s2">&quot;max_size_kb&quot;</span>: -1,
+</span><span class='line'>      <span class="s2">&quot;max_objects&quot;</span>: -1<span class="o">}</span>,
+</span><span class='line'>  <span class="s2">&quot;user_quota&quot;</span>: <span class="o">{</span> <span class="s2">&quot;enabled&quot;</span>: <span class="nb">false</span>,
+</span><span class='line'>      <span class="s2">&quot;max_size_kb&quot;</span>: -1,
+</span><span class='line'>      <span class="s2">&quot;max_objects&quot;</span>: -1<span class="o">}}</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">$ </span>/etc/init.d/radosgw reload
+</span><span class='line'>Reloading ...
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>To configure s3cmd for RadosGW you can have a look here :
+<a href="http://lollyrock.com/articles/s3cmd-with-radosgw/">http://lollyrock.com/articles/s3cmd-with-radosgw/</a></p>
+
+<p>Now we can test bucket creation :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>s3cmd mb s3://custombucket --bucket-location<span class="o">=</span>custom-placement
+</span><span class='line'>Bucket <span class="s1">&#39;custombucket&#39;</span> created
+</span><span class='line'>
+</span><span class='line'><span class="nv">$ </span>touch <span class="s2">&quot;file_on_custom_pool&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">$ </span>s3cmd put file_on_custom_pool s3://custombucket
+</span><span class='line'>WARNING: Module python-magic is not available. Guessing MIME types based on file extensions.
+</span><span class='line'>file_on_custom_pool -&gt; s3://custombucket/file_on_custom_pool  <span class="o">[</span>1 of 1<span class="o">]</span>
+</span><span class='line'> 0 of 0     0% in    0s     0.00 B/s  <span class="k">done</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Verify :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>radosgw-admin bucket stats --bucket<span class="o">=</span>custombucket
+</span><span class='line'><span class="o">{</span> <span class="s2">&quot;bucket&quot;</span>: <span class="s2">&quot;custombucket&quot;</span>,
+</span><span class='line'>  <span class="s2">&quot;pool&quot;</span>: <span class="s2">&quot;.rgw.buckets.custom&quot;</span>,
+</span><span class='line'>  <span class="s2">&quot;index_pool&quot;</span>: <span class="s2">&quot;.rgw.buckets.index&quot;</span>,
+</span><span class='line'>  <span class="s2">&quot;id&quot;</span>: <span class="s2">&quot;default.240909.1&quot;</span>,
+</span><span class='line'>  <span class="s2">&quot;marker&quot;</span>: <span class="s2">&quot;default.240909.1&quot;</span>,
+</span><span class='line'>  <span class="s2">&quot;owner&quot;</span>: <span class="s2">&quot;testuser&quot;</span>,
+</span><span class='line'>  <span class="s2">&quot;ver&quot;</span>: 1,
+</span><span class='line'>  <span class="s2">&quot;master_ver&quot;</span>: 0,
+</span><span class='line'>  <span class="s2">&quot;mtime&quot;</span>: 1417016078,
+</span><span class='line'>  <span class="s2">&quot;max_marker&quot;</span>: <span class="s2">&quot;&quot;</span>,
+</span><span class='line'>  <span class="s2">&quot;usage&quot;</span>: <span class="o">{}</span>,
+</span><span class='line'>  <span class="s2">&quot;bucket_quota&quot;</span>: <span class="o">{</span> <span class="s2">&quot;enabled&quot;</span>: <span class="nb">false</span>,
+</span><span class='line'>      <span class="s2">&quot;max_size_kb&quot;</span>: -1,
+</span><span class='line'>      <span class="s2">&quot;max_objects&quot;</span>: -1<span class="o">}}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Pool var is set on &ldquo;.rgw.buckets.custom&rdquo;.</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>rados -p .rgw.buckets.custom ls
+</span><span class='line'>default.241071.1_file_on_custom_pool
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>It&rsquo;s here !</p>
+
+<p>Data placement pool is define in this order :</p>
+
+<ol>
+<li>from the request (&ldquo;bucket location&rdquo;)</li>
+<li>from user (&ldquo;default_placement&rdquo; : see with <code>radosgw-admin metadata get user:&lt;uid&gt;</code>)</li>
+<li>from region map (&ldquo;default_placement&rdquo;)</li>
+</ol>
+
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Laurent Barbe</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2014-11-28T22:41:04+01:00" pubdate data-updated="true" class="updated">Nov 28<span>th</span>, 2014</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/radosgw/'>RadosGW</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="//twitter.com/share" class="twitter-share-button" data-url="http://cephnotes.ksperis.com/blog/2014/11/28/placement-pools-on-rados-gw/" data-via="ksperis" data-counturl="http://cephnotes.ksperis.com/blog/2014/11/28/placement-pools-on-rados-gw/" >Tweet</a>
+  
+  
+  <div class="g-plusone" data-size="medium"></div>
+  
+  
+    <div class="fb-like" data-send="true" data-width="450" data-show-faces="false"></div>
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2014/11/17/ceph-rbd-with-lxc-containers/" title="Previous Post: Ceph RBD with LXC containers">&laquo; Ceph RBD with LXC containers</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2014/12/18/use-discard-with-krbd-client-since-kernel-3-dot-18/" title="Next Post: Use trim/discard with rbd kernel client (since kernel 3.18)">Use trim/discard with rbd kernel client (since kernel 3.18) &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2017/07/28/how-many-mouvement-when-i-add-a-replica/">How Many Mouvement When I Add a Replica ?</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/03/03/dealing-with-some-osd-timeouts/">Dealing With Some Osd Timeouts</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/27/erasure-code-on-small-clusters/">Erasure Code on Small Clusters</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/23/crushmap-for-2-dc/">Crushmap for 2 DC</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/20/change-log-level-on-the-fly-to-ceph-daemons/">Change Log Level on the Fly to Ceph Daemons</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/06/main-new-features-in-the-latest-versions-of-ceph/">Main New Features in the Latest Versions of Ceph</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/05/26/check-osd-version/">Check OSD Version</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/05/24/find-the-osd-location/">Find the OSD Location</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd/">LXC 2.0.0 First Support for Ceph RBD</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/08/13/downgrade-lsi-9207-to-p19-firmware/">Downgrade LSI 9207 to P19 Firmware</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/25/get-omap-key-slash-value-size/">Get OMAP Key/value Size</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/22/the-kernel-4-dot-1-is-out/">The Kernel 4.1 Is Out</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/18/add-support-of-curl-multi-wait-for-radosgw-on-debian-wheezy/">Add Support of Curl_multi_wait for RadosGW on Debian Wheezy</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/19/intel-520-ssd-journal/">Intel 520 SSD Journal</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/12/radosgw-big-index/">RadosGW Big Index</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/ksperis">@ksperis</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'ksperis',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2017 - Laurent Barbe -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'cephnotes';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://cephnotes.ksperis.com/blog/2014/11/28/placement-pools-on-rados-gw/';
+        var disqus_url = 'http://cephnotes.ksperis.com/blog/2014/11/28/placement-pools-on-rados-gw/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id; js.async = true;
+  js.src = "//connect.facebook.net/en_US/all.js#appId=212934732101925&xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+
+
+
+  <script type="text/javascript">
+    (function() {
+      var script = document.createElement('script'); script.type = 'text/javascript'; script.async = true;
+      script.src = 'https://apis.google.com/js/plusone.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(script, s);
+    })();
+  </script>
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = '//platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

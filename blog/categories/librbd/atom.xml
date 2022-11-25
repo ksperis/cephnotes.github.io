@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: librbd | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/librbd/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[OpenNebula 4.8 with Ceph Support on Debian Wheezy]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2014/11/14/opennebula-4-dot-8-with-ceph-support-on-debian-wheezy/"/>
+    <updated>2014-11-14T16:57:10+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2014/11/14/opennebula-4-dot-8-with-ceph-support-on-debian-wheezy</id>
+    <content type="html"><![CDATA[<p>A quick howto to install OpenNebula 4.8 with support for Ceph on Debian Wheezy.</p>
+
+<p><code>bash
+$ onedatastore show cephds
+DATASTORE 101 INFORMATION                                                       
+ID             : 101                 
+NAME           : cephds              
+USER           : oneadmin            
+GROUP          : oneadmin            
+CLUSTER        : -                   
+TYPE           : IMAGE               
+DS_MAD         : ceph                
+TM_MAD         : ceph                
+BASE PATH      : /var/lib/one//datastores/101
+DISK_TYPE      : RBD        
+</code></p>
+
+<!-- more -->
+
+
+<h1>OpenNebula Installation</h1>
+
+<h2>OpenNebula Frontend</h2>
+
+<p>Install OpenNebula repo</p>
+
+<pre><code>wget -q -O- http://downloads.opennebula.org/repo/Ubuntu/repo.key | apt-key add -
+echo "deb http://downloads.opennebula.org/repo/4.8/Debian/7/ stable opennebula" &gt; /etc/apt/sources.list.d/opennebula.list
+</code></pre>
+
+<p>Download packages</p>
+
+<pre><code>apt-get update
+apt-get install opennebula opennebula-sunstone nfs-kernel-server
+</code></pre>
+
+<p>Configure and start the service</p>
+
+<pre><code>sed -i -e 's/:host: 127.0.0.1/:host: 0.0.0.0/g' /etc/one/sunstone-server.conf
+/etc/init.d/opennebula-sunstone restart
+</code></pre>
+
+<p>Export NFS</p>
+
+<pre><code>echo "/var/lib/one/ *(rw,sync,no_subtree_check,root_squash)" &gt;&gt; /etc/exports
+service nfs-kernel-server restart
+</code></pre>
+
+<p>Configure SSH Public Key</p>
+
+<pre><code>su - oneadmin
+$ cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
+
+
+$ cat &lt;&lt; EOT &gt; ~/.ssh/config
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+EOT
+$ chmod 600 ~/.ssh/config
+</code></pre>
+
+<h2>OpenNebula Compute Nodes</h2>
+
+<p>Install OpenNebula repo</p>
+
+<pre><code>wget -q -O- http://downloads.opennebula.org/repo/Ubuntu/repo.key | apt-key add -
+echo "deb http://downloads.opennebula.org/repo/4.8/Debian/7/ stable opennebula" &gt; /etc/apt/sources.list.d/opennebula.list
+</code></pre>
+
+<p>Download packages</p>
+
+<pre><code>apt-get update
+apt-get install opennebula-node nfs-common bridge-utils
+</code></pre>
+
+<p>Network config</p>
+
+<pre><code>vim /etc/network/interfaces
+    ...
+    bridge_ports eth0
+    bridge_fd 9
+    bridge_hello 2
+    bridge_maxage 12
+    bridge_stp off
+</code></pre>
+
+<p>Fstab</p>
+
+<pre><code>vim /etc/fstab
+10.2.0.130:/var/lib/one/  /var/lib/one/  nfs   soft,intr,rsize=8192,wsize=8192,noauto
+mount /var/lib/one/
+</code></pre>
+
+<p>Qemu config</p>
+
+<pre><code>cat &lt;&lt; EOT &gt; /etc/libvirt/qemu.conf
+user  = "oneadmin"
+group = "oneadmin"
+dynamic_ownership = 0
+EOT
+</code></pre>
+
+<h1>Ceph configuration</h1>
+
+<p>I suppose that you have already a Ceph cluster running.</p>
+
+<p>Now create a pool &ldquo;one&rdquo; for Opennebula and create auth key.</p>
+
+<pre><code>ceph osd pool create one 128 128
+ceph osd pool set one crush_ruleset 2
+ceph auth get-or-create client.one mon 'allow r' osd 'allow rwx pool=one'
+[client.one]
+    key = AQCfTjVUeOPqIhAAiCAiBIgYd85fuMFT0dXVpA==
+</code></pre>
+
+<h2>Add Ceph firefly for support rbd on libvirt + qemu</h2>
+
+<p>Before, you need compile rbd support for libvirt and qemu. You can have a look to this post : <a href="http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy">http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy</a> (If you do not want to compile qemu you can directluy download those packages here : <a href="http://ksperis.com/files/qemu-kvm_1.1.2+dfsg-6_amd64.deb,">http://ksperis.com/files/qemu-kvm_1.1.2+dfsg-6_amd64.deb,</a> <a href="http://ksperis.com/files/qemu-kvm_1.1.2+dfsg-6_amd64.deb">http://ksperis.com/files/qemu-kvm_1.1.2+dfsg-6_amd64.deb</a>)</p>
+
+<p>On each node, add Ceph firefly repo, and reinstall libvirt and qemu packages</p>
+
+<pre><code>apt-get install lsb-release
+wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
+echo deb http://ceph.com/debian-firefly/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
+apt-get update
+apt-get install librados2 librbd1
+
+dpkg -i qemu-kvm_1.1.2+dfsg-6+deb7u4_amd64.deb qemu-utils_1.1.2+dfsg-6a+deb7u4_amd64.deb
+</code></pre>
+
+<p>Create the secret for libvirt :</p>
+
+<pre><code>echo "
+&lt;secret ephemeral='no' private='no'&gt;
+   &lt;usage type='ceph'&gt;
+     &lt;name&gt;client.one secret&lt;/name&gt;
+   &lt;/usage&gt;
+&lt;/secret&gt;" &gt; secret.xml
+
+
+service libvirt reload
+</code></pre>
+
+<p>Add ceph datastore on OpenNebula</p>
+
+<pre><code>$ su - oneadmin
+$ vim ceph.one
+NAME         = cephds
+DS_MAD       = ceph
+TM_MAD       = ceph
+DISK_TYPE    = RBD
+POOL_NAME    = one
+BRIDGE_LIST  ="onenode1 onenode2 onenode3"
+CEPH_HOST    ="192.168.0.1:6789 192.168.0.2:6789 192.168.0.3:6789"
+CEPH_SECRET  ="26a8b4d7-eb24-bf85-396d-fbf0x252e402"
+CEPH_USER    ="one"
+
+$ onedatastore create ceph.one
+ID: 101
+</code></pre>
+
+<p>Example config :</p>
+
+<pre><code>$ onedatastore show cephds
+DATASTORE 101 INFORMATION                                                       
+ID             : 101                 
+NAME           : cephds              
+USER           : oneadmin            
+GROUP          : oneadmin            
+CLUSTER        : -                   
+TYPE           : IMAGE               
+DS_MAD         : ceph                
+TM_MAD         : ceph                
+BASE PATH      : /var/lib/one//datastores/101
+DISK_TYPE      : RBD                 
+
+DATASTORE CAPACITY                                                              
+TOTAL:         : 15.9T               
+FREE:          : 13.4T               
+USED:          : 2.5T                
+LIMIT:         : -                   
+
+PERMISSIONS                                                                     
+OWNER          : um-                 
+GROUP          : u--                 
+OTHER          : ---                 
+
+DATASTORE TEMPLATE                                                              
+BASE_PATH="/var/lib/one//datastores/"
+BRIDGE_LIST="onenode1 onenode2 onenode3"
+CEPH_HOST="192.168.0.1:6789 192.168.0.2:6789 192.168.0.3:6789"
+CEPH_SECRET="26a8b4d7-eb24-bf85-396d-fbf0x252e402"
+CEPH_USER="one"
+CLONE_TARGET="SELF"
+DISK_TYPE="RBD"
+DS_MAD="ceph"
+LN_TARGET="NONE"
+POOL_NAME="one"
+TM_MAD="ceph"
+TYPE="IMAGE_DS"
+
+IMAGES         
+9              
+10             
+11             
+12             
+16             
+21             
+24             
+27             
+28             
+29             
+31             
+32             
+</code></pre>
+
+<p>Try import image in new datastore :</p>
+
+<pre><code>$ oneimage create
+    --name "CentOS-6.5_x86_64"
+    --path "http://appliances.c12g.com/CentOS-6.5/centos6.5.qcow2.gz"
+    --driver qcow2
+    --datastore cephds
+</code></pre>
+
+<p>Datastore view in Sunstone :</p>
+
+<p><img src="/images/img018.png"></p>
+
+<p>More details here :</p>
+
+<p><a href="http://ceph.com/community/ceph-support-in-opennebula-4-0/">http://ceph.com/community/ceph-support-in-opennebula-4-0/</a></p>
+
+<p><a href="http://archives.opennebula.org/documentation:archives:rel4.0:ceph_ds">http://archives.opennebula.org/documentation:archives:rel4.0:ceph_ds</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Using ceph rbd with libvirt on Debian Wheezy]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy/"/>
+    <updated>2013-09-12T16:44:00+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy</id>
+    <content type="html"><![CDATA[<p>Howto add support of rbd device on debian wheezy.</p>
+
+<!-- more -->
+
+
+<h1>libvirt</h1>
+
+<p>Since wheezy, libvirt supports rbd device.</p>
+
+<h1>qemu-kvm</h1>
+
+<p>If you do not add the support in qemu-kvm you may have an error like this:</p>
+
+<pre><code>error: Failed to start domain ubuntu
+error: internal error process exited while connecting to monitor: char device redirected to /dev/pts/2
+kvm: -drive file=rbd:vmimages/ubuntu:id=vmimages:key=AQAfwTFScNKmLxAAo9abfSLct78rfIQRzQnS5A==:auth_supported=cephx\;none:mon_host=192.168.0.100\:6789\;192.168.0.101\:6789\;192.168.0.102\:6789,if=none,id=drive-virtio-disk0,format=raw,cache=writeback: could not open disk image rbd:vmimages/ubuntu:id=vmimages:key=AQAfwTFScNKmLxAAo9abfSLct78rfIQRzQnS5A==:auth_supported=cephx\;none:mon_host=192.168.0.100\:6789\;192.168.0.101\:6789\;192.168.0.102\:6789: No such file or directory
+</code></pre>
+
+<h2>install ceph dependencies</h2>
+
+<pre><code>apt-get install lsb-release
+wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
+echo deb http://ceph.com/debian-firefly/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
+apt-get update
+apt-get install librbd-dev librados-dev build-essential
+</code></pre>
+
+<h2>build kvm</h2>
+
+<pre><code>mkdir -p sources/qemu-kvm
+cd sources/qemu-kvm
+apt-get source qemu-kvm
+apt-get build-dep qemu-kvm
+cd qemu-kvm-1.1.2+dfsg/
+vim debian/optional-features
+</code></pre>
+
+<p>Uncomment line <code># --enable-rbd</code>
+and compile :</p>
+
+<pre><code>dpkg-buildpackage -rfakeroot -b
+cd ..
+</code></pre>
+
+<p>Installation :</p>
+
+<pre><code>apt-get install librados2 librbd1
+dpkg -i kvm_1.1.2+dfsg-6_amd64.deb qemu-kvm_1.1.2+dfsg-6_amd64.deb
+</code></pre>
+
+<p>Becareful on upgrade !
+You can also hold package version :</p>
+
+<pre><code>echo "kvm hold" | dpkg --set-selections
+echo "qemu-kvm hold" | dpkg --set-selections
+</code></pre>
+
+<h1>qemu (for util like qemu-img)</h1>
+
+<p>(Only if needed)
+You also need to add support in debian rules : &ldquo;&mdash;enable-rbd&rdquo;</p>
+
+<pre><code>mkdir -p sources/qemu
+cd sources/qemu
+apt-get source qemu
+apt-get build-dep qemu
+cd qemu-1.1.2+dfsg/
+vim debian/rules +82
+dpkg-buildpackage -rfakeroot -b
+cd ..
+</code></pre>
+
+<h1>Use</h1>
+
+<p>Create a pool and associated key on ceph admin host :</p>
+
+<pre><code>ceph osd pool create vmimages 100 100
+ceph auth get-or-create client.vmimages mon 'allow r' osd 'allow rwx pool=vmimages'
+</code></pre>
+
+<p>keep the key returned.</p>
+
+<p>Create a secret file for libvirt for this user :</p>
+
+<pre><code>echo "
+    &lt;secret ephemeral='no' private='no'&gt;
+   &lt;usage type='ceph'&gt;
+     &lt;name&gt;client.vmimages secret&lt;/name&gt;
+   &lt;/usage&gt;
+&lt;/secret&gt;" &gt; secret.xml
+
+virsh secret-define --file secret.xml
+</code></pre>
+
+<p>Define the key value :
+first uuid is the value return by the previous command
+follow by the key return by <code>ceph auth get-or-create</code></p>
+
+<pre><code>virsh secret-set-value  76e3a541-b997-58ac-f7bd-77dd7d4347cb AQAREH1QkNDNCBaac03ZICi/CePnRDS+vGyrqQ==
+</code></pre>
+
+<p>Create a device:</p>
+
+<p>(on ceph admin host if you do not want to specify the user, the key, and monitors)
+with rbd : <code>rbd create vmimages/ubuntu-newdrive --size=2048</code>
+with qemu (you need to add support for that) : <code>qemu-img create -f rbd rbd:vmimages/ubuntu-newdrive 2G</code></p>
+
+<p>Attach on existing host (even if running) :</p>
+
+<p>(192.168.0.100, 192.168.0.101, 192.168.0.102 is the mon host.)</p>
+
+<pre><code>echo "
+    &lt;disk type='network' device='disk'&gt;
+      &lt;driver name='qemu' type='raw'/&gt;
+      &lt;auth username='vmimages'&gt;
+        &lt;secret type='ceph' uuid='76e3a541-b997-58ac-f7bd-77dd7d4347cb'/&gt;
+      &lt;/auth&gt;
+      &lt;source protocol='rbd' name='vmimages/ubuntu-newdrive'&gt;
+        &lt;host name='192.168.0.100' port='6789'/&gt;
+        &lt;host name='192.168.0.101' port='6789'/&gt;
+        &lt;host name='192.168.0.102' port='6789'/&gt;
+      &lt;/source&gt;
+      &lt;target dev='vdz' bus='virtio'/&gt;
+    &lt;/disk&gt;
+" &gt; device.xml
+
+virsh attach-device ubuntu device.xml --persistent 
+</code></pre>
+]]></content>
+  </entry>
+  
+</feed>

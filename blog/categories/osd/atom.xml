@@ -1,0 +1,471 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: OSD | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/osd/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Check OSD version]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2016/05/26/check-osd-version/"/>
+    <updated>2016-05-26T14:45:04+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2016/05/26/check-osd-version</id>
+    <content type="html"><![CDATA[<p>Occasionally it may be useful to check the version of the OSD on the entire cluster :</p>
+
+<p><code>bash
+ceph tell osd.* version
+</code></p>
+
+<!--more-->
+
+
+<p>```
+osd.0: {</p>
+
+<pre><code>"version": "ceph version 0.94.5-224-g4051bc2 (4051bc2a5e4313ac0f6236d7a34ed5fb4a1d9ea2)"
+</code></pre>
+
+<p>}
+osd.1: {</p>
+
+<pre><code>"version": "ceph version 0.94.5-224-g4051bc2 (4051bc2a5e4313ac0f6236d7a34ed5fb4a1d9ea2)"
+</code></pre>
+
+<p>}
+osd.2: {</p>
+
+<pre><code>"version": "ceph version 0.94.5-224-g4051bc2 (4051bc2a5e4313ac0f6236d7a34ed5fb4a1d9ea2)"
+</code></pre>
+
+<p>}
+osd.3: {</p>
+
+<pre><code>"version": "ceph version 0.94.6 (e832001feaf8c176593e0325c8298e3f16dfb403)"
+</code></pre>
+
+<p>}
+osd.4: {</p>
+
+<pre><code>"version": "ceph version 0.94.6 (e832001feaf8c176593e0325c8298e3f16dfb403)"
+</code></pre>
+
+<p>}
+osd.5: {</p>
+
+<pre><code>"version": "ceph version 0.94.6 (e832001feaf8c176593e0325c8298e3f16dfb403)"
+</code></pre>
+
+<p>}
+osd.6: {</p>
+
+<pre><code>"version": "ceph version 0.94.6 (e832001feaf8c176593e0325c8298e3f16dfb403)"
+</code></pre>
+
+<p>}
+&hellip;
+```</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Find the OSD location]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2016/05/24/find-the-osd-location/"/>
+    <updated>2016-05-24T19:24:59+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2016/05/24/find-the-osd-location</id>
+    <content type="html"><![CDATA[<p>Of course, the simplest way is using the command <code>ceph osd tree</code>.</p>
+
+<p>Note that, if an osd is down, you can see &ldquo;last address&rdquo; in <code>ceph health detail</code> :
+<code>bash
+$ ceph health detail
+...
+osd.37 is down since epoch 16952, last address 172.16.4.68:6804/628
+</code></p>
+
+<p>Also, you can use:
+```bash
+$ ceph osd find 37
+{</p>
+
+<pre><code>"osd": 37,
+"ip": "172.16.4.68:6804\/636",
+"crush_location": {
+    "datacenter": "pa2.ssdr",
+    "host": "lxc-ceph-main-front-osd-03.ssdr",
+    "physical-host": "store-front-03.ssdr",
+    "rack": "pa2-104.ssdr",
+    "root": "ssdr"
+}
+</code></pre>
+
+<p>}
+```</p>
+
+<p>To get partition UUID, you can use <code>ceph osd dump</code> (see at the end of the line) :
+```bash
+$ ceph osd dump | grep ^osd.37
+osd.37 down out weight 0 up_from 56847 up_thru 57230 down_at 57538 last_clean_interval [56640,56844) 172.16.4.72:6801/16852 172.17.2.37:6801/16852 172.17.2.37:6804/16852 172.16.4.72:6804/16852 exists d7ab9ac1-c68c-4594-b25e-48d3a7cfd182</p>
+
+<p>$ ssh 172.17.2.37 | blkid | grep d7ab9ac1-c68c-4594-b25e-48d3a7cfd182
+/dev/sdg1: UUID=&ldquo;98594f17-eae5-45f8-9e90-cd25a8f89442&rdquo; TYPE=&ldquo;xfs&rdquo; PARTLABEL=&ldquo;ceph data&rdquo; PARTUUID=&ldquo;d7ab9ac1-c68c-4594-b25e-48d3a7cfd182&rdquo;</p>
+
+<h1>(Depending on how the partitions are created, PARTUUID label is not necessarily present.)</h1>
+
+<p>```</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Get OMAP key/value size]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/06/25/get-omap-key-slash-value-size/"/>
+    <updated>2015-06-25T16:40:15+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/06/25/get-omap-key-slash-value-size</id>
+    <content type="html"><![CDATA[<p>List the total size of all keys for each object on a pool.</p>
+
+<pre><code>object        size_keys(kB)  size_values(kB)  total(kB)  nr_keys  nr_values
+meta.log.44   0              1                1          0        10
+data_log.78   0              56419            56419      0        406841
+meta.log.36   0              1                1          0        10
+data_log.71   0              56758            56758      0        409426
+data_log.111  0              56519            56519      0        405909
+...
+</code></pre>
+
+<!--more-->
+
+
+<p>This is based on the command <code>rados listomapvals</code>.</p>
+
+<pre><code>pool='.rgw.buckets.index'
+list=`rados -p $pool ls`
+
+(
+echo "object size_keys(kB) size_values(kB) total(kB) nr_keys nr_values"
+for obj in $list; do
+echo -en "$obj ";
+rados -p $pool listomapvals $obj | awk '
+/^key: \(.* bytes\)/ { sizekey+= substr($2, 2, length($2)); nbkeys++ }
+/^value: \(.* bytes\)/ { sizevalue+= substr($2, 2, length($2)); nbvalues++ }
+END { printf("%i %i %i %i %i\n", sizekey/1024, sizevalue/1024, (sizekey+sizevalue)/1024, nbkey, nbvalues) }
+'
+done
+)
+</code></pre>
+
+<p>The method is not really optimal, so it may take some time. But it helps to have an idea.</p>
+
+<p>You can add <code>| column -t</code> at the end of the command line for better display :</p>
+
+<pre><code>object                    size_keys(kB)  size_values(kB)  total(kB)  nr_keys  nr_values
+.dir.default.1970130.1.250   8863          75592           84455      0        538692
+.dir.default.1977514.4.161   6             55              61         0        405
+.dir.default.1977550.10.98   12            83              95         0        692
+.dir.default.1977550.5.83    47            434             482        0        3074
+.dir.default.1977550.11.34   0             1               2          0        15
+.dir.default.1970130.1.69    9147          78077           87224      0        556235
+.dir.default.1977550.8.116   0             0               0          0        3
+.dir.default.1977550.3.49    0             4               5          0        36
+.dir.default.1930743.19.0    0             0               0          0        0
+.dir.default.1985483.1.40    204           1868            2073       0        13261
+.dir.default.1977514.7.77    0             8               9          0        66
+.dir.default.1977514.2.74    0             8               9          0        66
+.dir.default.1977550.8.113   0             1               2          0        15
+.dir.default.1977550.4.121   7             40              47         0        351
+.dir.default.1977514.8.122   0             0               0          0        6
+.dir.default.1985483.2.148   578           5423            6001       0        38583
+...
+</code></pre>
+
+<p><a href="http://ceph.com/docs/master/man/8/rados/#pool-specific-commands">http://ceph.com/docs/master/man/8/rados/#pool-specific-commands</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[get the number of placement groups per osd]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/"/>
+    <updated>2015-02-23T17:53:51+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd</id>
+    <content type="html"><![CDATA[<p>Get the PG distribution per osd in command line :</p>
+
+<pre><code>pool :  0   1   2   3   | SUM 
+------------------------------------------------
+osd.10  6   6   6   84  | 102
+osd.11  7   6   6   76  | 95
+osd.12  4   4   3   56  | 67
+osd.20  5   5   5   107 | 122
+osd.13  3   3   3   73  | 82
+osd.21  9   10  10  110 | 139
+osd.14  3   3   3   85  | 94
+osd.15  6   6   6   87  | 105
+osd.22  6   6   5   87  | 104
+osd.23  10  10  10  87  | 117
+osd.16  7   7   7   102 | 123
+osd.17  5   5   5   99  | 114
+osd.18  4   4   4   103 | 115
+osd.19  7   7   7   112 | 133
+osd.0   5   5   5   72  | 87
+osd.1   5   5   6   83  | 99
+osd.2   3   3   3   74  | 83
+osd.3   5   5   5   61  | 76
+osd.4   3   3   4   76  | 86
+osd.5   5   5   5   78  | 93
+osd.6   3   2   2   78  | 85
+osd.7   3   3   3   88  | 97
+osd.8   9   9   9   91  | 118
+osd.9   5   6   6   79  | 96
+------------------------------------------------
+SUM :   128 128 128 2048    |
+</code></pre>
+
+<!--more-->
+
+
+<p>The command :</p>
+
+<p><code>
+ceph pg dump | awk '
+BEGIN { IGNORECASE = 1 }
+ /^PG_STAT/ { col=1; while($col!="UP") {col++}; col++ }
+ /^[0-9a-f]+\.[0-9a-f]+/ { match($0,/^[0-9a-f]+/); pool=substr($0, RSTART, RLENGTH); poollist[pool]=0;
+ up=$col; i=0; RSTART=0; RLENGTH=0; delete osds; while(match(up,/[0-9]+/)&gt;0) { osds[++i]=substr(up,RSTART,RLENGTH); up = substr(up, RSTART+RLENGTH) }
+ for(i in osds) {array[osds[i],pool]++; osdlist[osds[i]];}
+}
+END {
+ printf("\n");
+ printf("pool :\t"); for (i in poollist) printf("%s\t",i); printf("| SUM \n");
+ for (i in poollist) printf("--------"); printf("----------------\n");
+ for (i in osdlist) { printf("osd.%i\t", i); sum=0;
+   for (j in poollist) { printf("%i\t", array[i,j]); sum+=array[i,j]; sumpool[j]+=array[i,j] }; printf("| %i\n",sum) }
+ for (i in poollist) printf("--------"); printf("----------------\n");
+ printf("SUM :\t"); for (i in poollist) printf("%s\t",sumpool[i]); printf("|\n");
+}'
+</code></p>
+
+<p>Copy-paste should work directly.
+The sum at bottom of the table must match to (pg_num x size).</p>
+
+<p>You can find pg_num recommandations here :
+<a href="http://ceph.com/docs/master/rados/operations/placement-groups/">http://ceph.com/docs/master/rados/operations/placement-groups/</a></p>
+
+<p>Also, a pg_num Calculator is avaible here :
+<a href="http://ceph.com/pgcalc">http://ceph.com/pgcalc</a></p>
+
+<p>To view the number of pg per osd :
+<a href="http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/">http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Difference between 'ceph osd reweight' and 'ceph osd crush reweight']]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2014/12/23/difference-between-ceph-osd-reweight-and-ceph-osd-crush-reweight/"/>
+    <updated>2014-12-23T10:03:06+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2014/12/23/difference-between-ceph-osd-reweight-and-ceph-osd-crush-reweight</id>
+    <content type="html"><![CDATA[<p>From Gregory and Craig in mailing list&hellip;</p>
+
+<p><blockquote><p>&ldquo;ceph osd crush reweight&rdquo; sets the CRUSH weight of the OSD. This<br/>weight is an arbitrary value (generally the size of the disk in TB or<br/>something) and controls how much data the system tries to allocate to<br/>the OSD.</p></p><p><p>&ldquo;ceph osd reweight&rdquo; sets an override weight on the OSD. This value is<br/>in the range 0 to 1, and forces CRUSH to re-place (1-weight) of the<br/>data that would otherwise live on this drive. It does <em>not</em> change the<br/>weights assigned to the buckets above the OSD, and is a corrective<br/>measure in case the normal CRUSH distribution isn&rsquo;t working out quite<br/>right. (For instance, if one of your OSDs is at 90% and the others are<br/>at 50%, you could reduce this weight to try and compensate for it.)</p><footer><strong>Gregory Farnum <a href="http://lists.ceph.com/pipermail/ceph-users-ceph.com/2014-June/040961.html">http://lists.ceph.com/pipermail/ceph-users-ceph.com/2014-June/040961.html</a></strong></footer></blockquote></p>
+
+<p><blockquote><p>Note that &lsquo;ceph osd reweight&rsquo; is not a persistent setting.  When an OSD<br/>gets marked out, the osd weight will be set to 0.  When it gets marked in<br/>again, the weight will be changed to 1.</p></p><p><p>Because of this &lsquo;ceph osd reweight&rsquo; is a temporary solution.  You should<br/>only use it to keep your cluster running while you&rsquo;re ordering more<br/>hardware.</p><footer><strong>Craig Lewis <a href="http://lists.ceph.com/pipermail/ceph-users-ceph.com/2014-June/040967.html">http://lists.ceph.com/pipermail/ceph-users-ceph.com/2014-June/040967.html</a></strong></footer></blockquote></p>
+
+<p><a href="http://lists.ceph.com/pipermail/ceph-users-ceph.com/2014-June/040961.html">http://lists.ceph.com/pipermail/ceph-users-ceph.com/2014-June/040961.html</a></p>
+
+<!-- more -->
+
+
+<p>I asked myself when one of my osd was marked down (on my old cluster in Cuttlefish&hellip;) and I noticed that only the drive of the local machine seemed to fill. Something that seems normal since the weight of the host had not changed in crushmap.</p>
+
+<h2>Testing</h2>
+
+<p>Testing on simple cluster (Giant), with this crushmap :
+```
+ruleset 0
+type replicated
+min_size 1
+max_size 10
+step take default
+step chooseleaf firstn 0 type host</p>
+
+<pre><code>step emit
+</code></pre>
+
+<p>```</p>
+
+<p>Take the example of the 8 pgs on pool 3 :</p>
+
+<p><code>bash
+$ ceph pg dump | grep '^3.' | awk '{print $1,$15;}'
+dumped all in format plain
+3.4 [0,2]
+3.5 [4,1]
+3.6 [2,0]
+3.7 [2,1]
+3.0 [2,1]
+3.1 [0,2]
+3.2 [2,1]
+3.3 [2,4]
+</code></p>
+
+<p>Now I try ceph osd out :</p>
+
+<p>```bash
+$ ceph osd out 0    # This is equivalent to &ldquo;ceph osd reweight 0 0&rdquo;
+marked out osd.0.</p>
+
+<p>$ ceph osd tree</p>
+
+<h1>id    weight  type name   up/down reweight</h1>
+
+<p>-1  0.2 root default
+-2  0.09998     host ceph-01
+0   0.04999         osd.0   up  0       # &lt;&mdash; reweight has set to &ldquo;0&rdquo;
+4   0.04999         osd.4   up  1 <br/>
+-3  0.04999     host ceph-02
+1   0.04999         osd.1   up  1 <br/>
+-4  0.04999     host ceph-03
+2   0.04999         osd.2   up  1</p>
+
+<p>$ ceph pg dump | grep &lsquo;^3.&rsquo; | awk &lsquo;{print $1,$15;}&rsquo;
+dumped all in format plain
+3.4 [2,4]  # &lt;&mdash;  [0,2] (move pg on osd.4)
+3.5 [4,1]
+3.6 [2,1]  # &lt;&mdash;  [2,0] (move pg on osd.1)
+3.7 [2,1]
+3.0 [2,1]
+3.1 [2,1]  # &lt;&mdash;  [0,2] (move pg on osd.1)
+3.2 [2,1]
+3.3 [2,4]
+```</p>
+
+<p>Now I try ceph osd CRUSH out :</p>
+
+<p>```bash
+$ ceph osd crush reweight osd.0 0
+reweighted item id 0 name &lsquo;osd.0&rsquo; to 0 in crush map</p>
+
+<p>$ ceph osd tree</p>
+
+<h1>id    weight  type name   up/down reweight</h1>
+
+<p>-1  0.15    root default
+-2  0.04999     host ceph-01            # &lt;&mdash; the weight of the host changed
+0   0               osd.0   up  1       # &lt;&mdash; crush weight is set to &ldquo;0&rdquo;
+4   0.04999         osd.4   up  1 <br/>
+-3  0.04999     host ceph-02
+1   0.04999         osd.1   up  1 <br/>
+-4  0.04999     host ceph-03
+2   0.04999         osd.2   up  1</p>
+
+<p>$ ceph pg dump | grep &lsquo;^3.&rsquo; | awk &lsquo;{print $1,$15;}&rsquo;
+dumped all in format plain
+3.4 [4,2]  # &lt;&mdash;  [0,2] (move pg on osd.4)
+3.5 [4,1]
+3.6 [2,4]  # &lt;&mdash;  [2,0] (move pg on osd.4)
+3.7 [2,1]
+3.0 [2,1]
+3.1 [4,2]  # &lt;&mdash;  [0,2] (move pg on osd.4)
+3.2 [2,1]
+3.3 [2,1]
+```</p>
+
+<p>This does not seem very logical because the weight assigned to the bucket &ldquo;host ceph-01&rdquo; is still higher than the others. This would probably be different with more PG&hellip;</p>
+
+<h2>Trying with more pgs</h2>
+
+<p>```bash</p>
+
+<h1>Add more pg on my testpool</h1>
+
+<p>$ ceph osd pool set testpool pg_num 128
+set pool 3 pg_num to 128</p>
+
+<h1>Check repartition</h1>
+
+<p>$ for i in 0 1 2 4; do echo  &ldquo;osd.$i=$(ceph pg dump 2>/dev/null | grep &lsquo;^3.&rsquo; | awk &lsquo;{print $15;}&rsquo; | grep $i | wc -l) pgs&rdquo;; done
+osd.0=48 pgs
+osd.1=78 pgs
+osd.2=77 pgs
+osd.4=53 pgs</p>
+
+<p>$ ceph osd reweight 0 0
+reweighted osd.0 to 0 (802)
+$ for i in 0 1 2 4; do echo  &ldquo;osd.$i=$(ceph pg dump 2>/dev/null | grep &lsquo;^3.&rsquo; | awk &lsquo;{print $15;}&rsquo; | grep $i | wc -l) pgs&rdquo;; done
+osd.0=0 pgs
+osd.1=96 pgs
+osd.2=97 pgs
+osd.4=63 pgs
+```</p>
+
+<p>The distribution seems fair. Why in the same case, with Cuttlefish, distribution is not the same ?</p>
+
+<p>```bash
+$ ceph osd reweight 0 1
+reweighted osd.0 to 0 (802)
+$ for i in 0 1 2 4; do echo  &ldquo;osd.$i=$(ceph pg dump 2>/dev/null | grep &lsquo;^3.&rsquo; | awk &lsquo;{print $15;}&rsquo; | grep $i | wc -l) pgs&rdquo;; done
+osd.0=0 pgs
+osd.1=96 pgs
+osd.2=97 pgs
+osd.4=63 pgs</p>
+
+<p>$ ceph osd crush reweight osd.0 0
+reweighted osd.0 to 0 (802)</p>
+
+<p>$ for i in 0 1 2 4; do echo  &ldquo;osd.$i=$(ceph pg dump 2>/dev/null | grep &lsquo;^3.&rsquo; | awk &lsquo;{print $15;}&rsquo; | grep $i | wc -l) pgs&rdquo;; done
+osd.0=0 pgs
+osd.1=87 pgs
+osd.2=88 pgs
+osd.4=81 pgs
+```</p>
+
+<p>With crush reweight, everything is normal.</p>
+
+<h2>Trying with crush legacy</h2>
+
+<p>``` bash
+$ ceph osd crush tunables legacy
+adjusted tunables profile to legacy
+root@ceph-01:~/ceph-deploy# for i in 0 1 2 4; do echo  &ldquo;osd.$i=$(ceph pg dump 2>/dev/null | grep &lsquo;^3.&rsquo; | awk &lsquo;{print $15;}&rsquo; | grep $i | wc -l) pgs&rdquo;; done
+osd.0=0 pgs
+osd.1=87 pgs
+osd.2=88 pgs
+osd.4=81 pgs</p>
+
+<p>$ ceph osd crush reweight osd.0 0.04999
+reweighted item id 0 name &lsquo;osd.0&rsquo; to 0.04999 in crush map</p>
+
+<p>$ ceph osd tree</p>
+
+<h1>id    weight  type name   up/down reweight</h1>
+
+<p>-1  0.2 root default
+-2  0.09998     host ceph-01
+0   0.04999         osd.0   up  0 <br/>
+4   0.04999         osd.4   up  1 <br/>
+-3  0.04999     host ceph-02
+1   0.04999         osd.1   up  1 <br/>
+-4  0.04999     host ceph-03
+2   0.04999         osd.2   up  1</p>
+
+<p>$ for i in 0 1 2 4; do echo  &ldquo;osd.$i=$(ceph pg dump 2>/dev/null | grep &lsquo;^3.&rsquo; | awk &lsquo;{print $15;}&rsquo; | grep $i | wc -l) pgs&rdquo;; done
+osd.0=0 pgs
+osd.1=78 pgs
+osd.2=77 pgs
+osd.4=101 pgs   # &lt;&mdash;&ndash; All pg from osd.0 and osd.4 is here when using legacy value (on host ceph-01)
+```</p>
+
+<p>So, it is an evolution of the distribution algorithm to prefer a more global distribution when OSD is marked down (instead of distributing preferably by proximity). Indeed the old distribution can cause problems when there is not a lot of OSD by host, and that they are nearly full.</p>
+
+<p><blockquote><p>When some OSDs are marked out, the data tends to get redistributed to nearby OSDs instead of across the entire hierarchy.</p><footer><strong>Ceph Docs <a href="http://ceph.com/docs/master/rados/operations/crush-map/#impact-of-legacy-values">http://ceph.com/docs/master/rados/operations/crush-map/#impact-of-legacy-values</a></strong></footer></blockquote></p>
+
+<p>To view the number of pg per osd :</p>
+
+<p><a href="http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/">http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/</a></p>
+]]></content>
+  </entry>
+  
+</feed>

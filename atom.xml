@@ -1,0 +1,2392 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[How Many Mouvement When I Add a Replica ?]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2017/07/28/how-many-mouvement-when-i-add-a-replica/"/>
+    <updated>2017-07-28T15:15:46+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2017/07/28/how-many-mouvement-when-i-add-a-replica</id>
+    <content type="html"><![CDATA[<p>Make a simple simulation !</p>
+
+<p>Use your own crushmap :</p>
+
+<pre><code>$ ceph osd getcrushmap -o crushmap 
+
+got crush map from osdmap epoch 28673
+</code></pre>
+
+<p>Or create a sample clushmap :</p>
+
+<pre><code>$ crushtool --outfn crushmap --build --num_osds 36 host straw 12 root straw 0
+
+2017-07-28 15:01:16.240974 7f4dda123760  1 
+ID  WEIGHT  TYPE NAME
+-4  36.00000    root root
+-1  12.00000        host host0
+0   1.00000         osd.0
+1   1.00000         osd.1
+2   1.00000         osd.2
+3   1.00000         osd.3
+4   1.00000         osd.4
+5   1.00000         osd.5
+6   1.00000         osd.6
+7   1.00000         osd.7
+8   1.00000         osd.8
+9   1.00000         osd.9
+10  1.00000         osd.10
+11  1.00000         osd.11
+-2  12.00000        host host1
+12  1.00000         osd.12
+13  1.00000         osd.13
+14  1.00000         osd.14
+15  1.00000         osd.15
+16  1.00000         osd.16
+17  1.00000         osd.17
+18  1.00000         osd.18
+19  1.00000         osd.19
+20  1.00000         osd.20
+21  1.00000         osd.21
+22  1.00000         osd.22
+23  1.00000         osd.23
+-3  12.00000        host host2
+24  1.00000         osd.24
+25  1.00000         osd.25
+26  1.00000         osd.26
+27  1.00000         osd.27
+28  1.00000         osd.28
+29  1.00000         osd.29
+30  1.00000         osd.30
+31  1.00000         osd.31
+32  1.00000         osd.32
+33  1.00000         osd.33
+34  1.00000         osd.34
+35  1.00000         osd.35
+</code></pre>
+
+<p>Simulate the rule 0 or your own :</p>
+
+<pre><code>$ crushtool --test -i crushmap --rule 0 --show-mappings --min-x 0 --max-x 10 --num-rep 2
+
+CRUSH rule 0 x 0 [0,12]
+CRUSH rule 0 x 1 [5,24]
+CRUSH rule 0 x 2 [9,14]
+CRUSH rule 0 x 3 [30,11]
+CRUSH rule 0 x 4 [20,10]
+CRUSH rule 0 x 5 [28,0]
+CRUSH rule 0 x 6 [6,34]
+CRUSH rule 0 x 7 [19,31]
+CRUSH rule 0 x 8 [17,26]
+CRUSH rule 0 x 9 [9,20]
+CRUSH rule 0 x 10 [10,33]
+
+crushtool --test -i crushmap --rule 0 --show-mappings --min-x 0 --max-x 10 --num-rep 3
+
+CRUSH rule 0 x 0 [0,12,32]
+CRUSH rule 0 x 1 [5,24,20]
+CRUSH rule 0 x 2 [9,14,28]
+CRUSH rule 0 x 3 [30,11,13]
+CRUSH rule 0 x 4 [20,10,31]
+CRUSH rule 0 x 5 [28,0,12]
+CRUSH rule 0 x 6 [6,34,14]
+CRUSH rule 0 x 7 [19,31,6]
+CRUSH rule 0 x 8 [17,26,5]
+CRUSH rule 0 x 9 [9,20,30]
+CRUSH rule 0 x 10 [10,33,12]
+</code></pre>
+
+<p>In general it&rsquo;s going well. But in some cases it could be better to test.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Dealing With Some Osd Timeouts]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2017/03/03/dealing-with-some-osd-timeouts/"/>
+    <updated>2017-03-03T11:55:58+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2017/03/03/dealing-with-some-osd-timeouts</id>
+    <content type="html"><![CDATA[<p>In some cases, some operations may take a little longer to be processed by the osd. And the operation may fail, or even make the OSD to suicide.
+There are many parameters for these timeouts. Some examples :</p>
+
+<h2>Thread suicide timed out</h2>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heartbeat_map is_healthy 'OSD::osd_op_tp thread 0x7f1ee3ca7700' had suicide timed out after 150
+</span><span class='line'>common/HeartbeatMap.cc: In function 'bool ceph::HeartbeatMap::_check(ceph::heartbeat_handle_d*, const char*, time_t)' thread 7f1f0c2a3700 time 2017-03-03 11:03:46.550118
+</span><span class='line'>common/HeartbeatMap.cc: 79: FAILED assert(0 == "hit suicide timeout")</span></code></pre></td></tr></table></div></figure>
+
+
+<p>In ceph.conf :</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[osd]
+</span><span class='line'>osd_op_thread_suicide_timeout = 900</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>Operation thread timeout</h2>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heartbeat_map is_healthy 'OSD::osd_op_tp thread 0x7fd306416700' had timed out after 15</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ceph tell osd.XX injectargs --osd-op-thread-timeout 90
+</span><span class='line'>(default value is 15s)</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>Recovery thread timout</h2>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>heartbeat_map is_healthy 'OSD::recovery_tp thread 0x7f4c2edab700' had timed out after 30</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ceph tell osd.XX injectargs --osd-recovery-thread-timeout 180
+</span><span class='line'>(default value is 30s)</span></code></pre></td></tr></table></div></figure>
+
+
+<p>For more details, please refer to ceph documentation :</p>
+
+<p><a href="http://docs.ceph.com/docs/master/rados/configuration/osd-config-ref/">http://docs.ceph.com/docs/master/rados/configuration/osd-config-ref/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Erasure Code on Small Clusters]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2017/01/27/erasure-code-on-small-clusters/"/>
+    <updated>2017-01-27T16:47:51+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2017/01/27/erasure-code-on-small-clusters</id>
+    <content type="html"><![CDATA[<p>Erasure code is rather designed for clusters with a sufficient size. However if you want to use it with a small amount of hosts you can also adapt the crushmap for a better matching distribution to your need.</p>
+
+<p>Here a first example for distributing data with 1 host OR 2 drive fault tolerance with k=4, m=2 on 3 hosts and more.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rule erasure_ruleset {
+</span><span class='line'>  ruleset X
+</span><span class='line'>  type erasure
+</span><span class='line'>  min_size 6
+</span><span class='line'>  max_size 6
+</span><span class='line'>  step take default
+</span><span class='line'>  step choose indep 3 type host
+</span><span class='line'>  step choose indep 2 type osd
+</span><span class='line'>  step emit
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<!-- more -->
+
+
+<p>Testing it on sample crushmap :</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># crushtool --test -i crushmap.bin --rule 1 --show-mappings --x 1 --num-rep 6
+</span><span class='line'>CRUSH rule 1 x 1 [0,1,8,7,5,3]
+</span><span class='line'>
+</span><span class='line'># crushtool --test -i crushmap.bin --tree
+</span><span class='line'>ID    WEIGHT  TYPE NAME
+</span><span class='line'>-5      4.00000 root default
+</span><span class='line'>-1      1.00000         host host-01
+</span><span class='line'>0       1.00000                 osd.0   &lt;-- DATA
+</span><span class='line'>1       1.00000                 osd.1   &lt;-- DATA
+</span><span class='line'>2       1.00000                 osd.2
+</span><span class='line'>-2      1.00000         host host-02
+</span><span class='line'>3       1.00000                 osd.3   &lt;-- PARITY
+</span><span class='line'>4       1.00000                 osd.4
+</span><span class='line'>5       1.00000                 osd.5   &lt;-- PARITY
+</span><span class='line'>-3      1.00000         host host-03
+</span><span class='line'>6       1.00000                 osd.6
+</span><span class='line'>7       1.00000                 osd.7   &lt;-- DATA
+</span><span class='line'>8       1.00000                 osd.8   &lt;-- DATA
+</span><span class='line'>-4      1.00000         host host-04
+</span><span class='line'>9       1.00000                 osd.9
+</span><span class='line'>10      1.00000                 osd.10
+</span><span class='line'>11      1.00000                 osd.11
+</span><span class='line'>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Here is an other example for distributing data with ( 1 host AND 1 drive ) OR ( 3 drives ) fault tolerance with k=5, m=3 on 4 hosts and more.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rule erasure_ruleset {
+</span><span class='line'>  ruleset X
+</span><span class='line'>  type erasure
+</span><span class='line'>  min_size 8
+</span><span class='line'>  max_size 8
+</span><span class='line'>  step take default
+</span><span class='line'>  step choose indep 4 type host
+</span><span class='line'>  step choose indep 2 type osd
+</span><span class='line'>  step emit
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># crushtool --test -i crushmap.bin --rule 2 --show-mappings --x 1 --num-rep 8
+</span><span class='line'>CRUSH rule 2 x 1 [0,1,8,7,9,11,5,3]
+</span><span class='line'>
+</span><span class='line'># crushtool --test -i crushmap.bin --tree
+</span><span class='line'>ID      WEIGHT  TYPE NAME
+</span><span class='line'>-5      4.00000 root default
+</span><span class='line'>-1      1.00000         host host-01
+</span><span class='line'>0       1.00000                 osd.0   &lt;-- DATA
+</span><span class='line'>1       1.00000                 osd.1   &lt;-- DATA
+</span><span class='line'>2       1.00000                 osd.2
+</span><span class='line'>-2      1.00000         host host-02
+</span><span class='line'>3       1.00000                 osd.3   &lt;-- PARITY
+</span><span class='line'>4       1.00000                 osd.4
+</span><span class='line'>5       1.00000                 osd.5   &lt;-- PARITY
+</span><span class='line'>-3      1.00000         host host-03
+</span><span class='line'>6       1.00000                 osd.6
+</span><span class='line'>7       1.00000                 osd.7   &lt;-- DATA
+</span><span class='line'>8       1.00000                 osd.8   &lt;-- DATA
+</span><span class='line'>-4      1.00000         host host-04
+</span><span class='line'>9       1.00000                 osd.9   &lt;-- DATA
+</span><span class='line'>10      1.00000                 osd.10
+</span><span class='line'>11      1.00000                 osd.11  &lt;-- PARITY</span></code></pre></td></tr></table></div></figure>
+
+
+<p>And a last example for distributing data with ( 1 host AND 2 drives ) OR ( 4 drives ) fault tolerance with k=8, m=4 on 4 hosts and more.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rule erasure_ruleset {
+</span><span class='line'>  ruleset X
+</span><span class='line'>  type erasure
+</span><span class='line'>  min_size 12
+</span><span class='line'>  max_size 12
+</span><span class='line'>  step take default
+</span><span class='line'>  step choose indep 4 type host
+</span><span class='line'>  step choose indep 3 type osd
+</span><span class='line'>  step emit
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>An other possibility is to use LRC Erasure code plugin :</p>
+
+<p><a href="http://docs.ceph.com/docs/master/rados/operations/erasure-code-lrc/">http://docs.ceph.com/docs/master/rados/operations/erasure-code-lrc/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Crushmap for 2 DC]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2017/01/23/crushmap-for-2-dc/"/>
+    <updated>2017-01-23T10:04:14+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2017/01/23/crushmap-for-2-dc</id>
+    <content type="html"><![CDATA[<p>An example of crushmap for 2 Datacenter replication :</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>rule replicated_ruleset {
+</span><span class='line'>  ruleset X
+</span><span class='line'>  type replicated
+</span><span class='line'>  min_size 2
+</span><span class='line'>  max_size 3
+</span><span class='line'>  step take default
+</span><span class='line'>  step choose firstn 2 type datacenter
+</span><span class='line'>  step chooseleaf firstn -1 type host
+</span><span class='line'>  step emit
+</span><span class='line'>}</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This working well with pool size=2 (not recommended!) or 3.
+If you set pool size more than 3 (and increase the max_size in crush), be careful : you will have n-1 replica on one side and only one on the other datacenter.</p>
+
+<p>If you want to be able to write data even when one of the datacenters is inaccessible, pool min_size should be set at 1 even if size is set to 3. In this case, pay attention to the monitors location.</p>
+
+<!-- more -->
+
+
+<p>Other posts about crushmap : <a href="http://cephnotes.ksperis.com/blog/categories/crushmap/">http://cephnotes.ksperis.com/blog/categories/crushmap/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Change Log Level on the Fly to Ceph Daemons]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2017/01/20/change-log-level-on-the-fly-to-ceph-daemons/"/>
+    <updated>2017-01-20T11:55:53+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2017/01/20/change-log-level-on-the-fly-to-ceph-daemons</id>
+    <content type="html"><![CDATA[<p>Aaahhh full disk this morning.
+Sometimes the logs can go crazy, and the files can quickly reach several gigabytes.</p>
+
+<p>Show debug option (on host) :</p>
+
+<pre><code># Look at log file
+tail -n 1000 /var/log/ceph/ceph-osd.33.log
+
+# Check debug levels
+ceph daemon osd.33 config show | grep '"debug_'
+    "debug_none": "0\/5",
+    "debug_lockdep": "0\/1",
+    "debug_context": "0\/1",
+    "debug_crush": "1\/1",
+    "debug_mds": "1\/5",
+    ...
+    "debug_filestore": "1\/5",
+    ...
+</code></pre>
+
+<p>In my case it was about filestore, so &ldquo;ceph tell&rdquo; is my friend to apply the new value to the whole cluster (on admin host) :</p>
+
+<pre><code>ceph tell osd.* injectargs --debug-filestore 0/5
+</code></pre>
+
+<p>Now you can remove the log file on reopen it :</p>
+
+<pre><code>rm /var/log/ceph/ceph-osd.33.log
+
+ceph daemon osd.33 log reopen
+</code></pre>
+
+<p>Then it will remain to be added in the ceph.conf file (on each osd hosts) :</p>
+
+<pre><code>[osd]
+        debug filestore = 0/5
+</code></pre>
+
+<!-- more -->
+
+
+<p>For more information from ceph documentation :
+<a href="http://docs.ceph.com/docs/master/rados/troubleshooting/log-and-debug/">http://docs.ceph.com/docs/master/rados/troubleshooting/log-and-debug/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Main New Features in the Latest Versions of Ceph]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2017/01/06/main-new-features-in-the-latest-versions-of-ceph/"/>
+    <updated>2017-01-06T14:19:08+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2017/01/06/main-new-features-in-the-latest-versions-of-ceph</id>
+    <content type="html"><![CDATA[<p>It&rsquo;s always pleasant to see how fast new features appear in Ceph. :)</p>
+
+<p>Here is a non-exhaustive list of some of theme on the latest releases :</p>
+
+<h2>Kraken (October 2016)</h2>
+
+<ul>
+<li>BlueStore declared as stable</li>
+<li>AsyncMessenger</li>
+<li>RGW : metadata indexing via Elasticseasrch, index resharding, compression</li>
+<li>S3 bucket lifecycle API, RGW Export NFS version 3 throw Ganesha</li>
+<li>Rados support overwrites on erasure-coded pools / RBD on erasure coded pool (experimental)</li>
+</ul>
+
+
+<h2>Jewel (April 2016)</h2>
+
+<ul>
+<li>CephFS declared as stable</li>
+<li>RGW multisite rearchitected (Allow active/active configuration)</li>
+<li>AWS4 compatibility</li>
+<li>RBD mirroring</li>
+<li>BlueStore (experimental)</li>
+</ul>
+
+
+<!-- more -->
+
+
+<h2>Infernalis (November 2015)</h2>
+
+<ul>
+<li>Erasure coding declared as stable and support many new features</li>
+<li>New features for Swift API (Object expiration,&hellip;)</li>
+<li>Systemd</li>
+</ul>
+
+
+<h2>Hammer (April 2015)</h2>
+
+<ul>
+<li>RGW object versioning, bucket sharding</li>
+<li>Crush straw2</li>
+</ul>
+
+
+<h2>Giant (October 2014)</h2>
+
+<ul>
+<li>LRC erasure code</li>
+<li>CephFS journal recovery, diagnostic tools</li>
+</ul>
+
+
+<h2>Firefly (May 2014)</h2>
+
+<ul>
+<li>Erasure coding</li>
+<li>Cache tiering</li>
+<li>Key/value OSD backend</li>
+<li>Standalone radosgw (with civetweb)</li>
+</ul>
+
+
+<p>Maybe this will make you want to upgrade your cluster.</p>
+
+<p><a href="http://docs.ceph.com/docs/master/releases/">http://docs.ceph.com/docs/master/releases/</a></p>
+
+<p><a href="http://docs.ceph.com/docs/master/release-notes/">http://docs.ceph.com/docs/master/release-notes/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Check OSD Version]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2016/05/26/check-osd-version/"/>
+    <updated>2016-05-26T14:45:04+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2016/05/26/check-osd-version</id>
+    <content type="html"><![CDATA[<p>Occasionally it may be useful to check the version of the OSD on the entire cluster :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>ceph tell osd.* version
+</span></code></pre></td></tr></table></div></figure>
+
+
+<!--more-->
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>osd.0: <span class="o">{</span>
+</span><span class='line'>    <span class="s2">&quot;version&quot;</span>: <span class="s2">&quot;ceph version 0.94.5-224-g4051bc2 (4051bc2a5e4313ac0f6236d7a34ed5fb4a1d9ea2)&quot;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>osd.1: <span class="o">{</span>
+</span><span class='line'>    <span class="s2">&quot;version&quot;</span>: <span class="s2">&quot;ceph version 0.94.5-224-g4051bc2 (4051bc2a5e4313ac0f6236d7a34ed5fb4a1d9ea2)&quot;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>osd.2: <span class="o">{</span>
+</span><span class='line'>    <span class="s2">&quot;version&quot;</span>: <span class="s2">&quot;ceph version 0.94.5-224-g4051bc2 (4051bc2a5e4313ac0f6236d7a34ed5fb4a1d9ea2)&quot;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>osd.3: <span class="o">{</span>
+</span><span class='line'>    <span class="s2">&quot;version&quot;</span>: <span class="s2">&quot;ceph version 0.94.6 (e832001feaf8c176593e0325c8298e3f16dfb403)&quot;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>osd.4: <span class="o">{</span>
+</span><span class='line'>    <span class="s2">&quot;version&quot;</span>: <span class="s2">&quot;ceph version 0.94.6 (e832001feaf8c176593e0325c8298e3f16dfb403)&quot;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>osd.5: <span class="o">{</span>
+</span><span class='line'>    <span class="s2">&quot;version&quot;</span>: <span class="s2">&quot;ceph version 0.94.6 (e832001feaf8c176593e0325c8298e3f16dfb403)&quot;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>osd.6: <span class="o">{</span>
+</span><span class='line'>    <span class="s2">&quot;version&quot;</span>: <span class="s2">&quot;ceph version 0.94.6 (e832001feaf8c176593e0325c8298e3f16dfb403)&quot;</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>...
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Find the OSD Location]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2016/05/24/find-the-osd-location/"/>
+    <updated>2016-05-24T19:24:59+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2016/05/24/find-the-osd-location</id>
+    <content type="html"><![CDATA[<p>Of course, the simplest way is using the command <code>ceph osd tree</code>.</p>
+
+<p>Note that, if an osd is down, you can see &ldquo;last address&rdquo; in <code>ceph health detail</code> :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>ceph health detail
+</span><span class='line'>...
+</span><span class='line'>osd.37 is down since epoch 16952, last address 172.16.4.68:6804/628
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Also, you can use:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>ceph osd find 37
+</span><span class='line'><span class="o">{</span>
+</span><span class='line'>    <span class="s2">&quot;osd&quot;</span>: 37,
+</span><span class='line'>    <span class="s2">&quot;ip&quot;</span>: <span class="s2">&quot;172.16.4.68:6804\/636&quot;</span>,
+</span><span class='line'>    <span class="s2">&quot;crush_location&quot;</span>: <span class="o">{</span>
+</span><span class='line'>        <span class="s2">&quot;datacenter&quot;</span>: <span class="s2">&quot;pa2.ssdr&quot;</span>,
+</span><span class='line'>        <span class="s2">&quot;host&quot;</span>: <span class="s2">&quot;lxc-ceph-main-front-osd-03.ssdr&quot;</span>,
+</span><span class='line'>        <span class="s2">&quot;physical-host&quot;</span>: <span class="s2">&quot;store-front-03.ssdr&quot;</span>,
+</span><span class='line'>        <span class="s2">&quot;rack&quot;</span>: <span class="s2">&quot;pa2-104.ssdr&quot;</span>,
+</span><span class='line'>        <span class="s2">&quot;root&quot;</span>: <span class="s2">&quot;ssdr&quot;</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>To get partition UUID, you can use <code>ceph osd dump</code> (see at the end of the line) :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>ceph osd dump | grep ^osd.37
+</span><span class='line'>osd.37 down out weight 0 up_from 56847 up_thru 57230 down_at 57538 last_clean_interval <span class="o">[</span>56640,56844<span class="o">)</span> 172.16.4.72:6801/16852 172.17.2.37:6801/16852 172.17.2.37:6804/16852 172.16.4.72:6804/16852 exists d7ab9ac1-c68c-4594-b25e-48d3a7cfd182
+</span><span class='line'>
+</span><span class='line'><span class="nv">$ </span>ssh 172.17.2.37 | blkid | grep d7ab9ac1-c68c-4594-b25e-48d3a7cfd182
+</span><span class='line'>/dev/sdg1: <span class="nv">UUID</span><span class="o">=</span><span class="s2">&quot;98594f17-eae5-45f8-9e90-cd25a8f89442&quot;</span> <span class="nv">TYPE</span><span class="o">=</span><span class="s2">&quot;xfs&quot;</span> <span class="nv">PARTLABEL</span><span class="o">=</span><span class="s2">&quot;ceph data&quot;</span> <span class="nv">PARTUUID</span><span class="o">=</span><span class="s2">&quot;d7ab9ac1-c68c-4594-b25e-48d3a7cfd182&quot;</span>
+</span><span class='line'><span class="c">#(Depending on how the partitions are created, PARTUUID label is not necessarily present.)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[LXC 2.0.0 First Support for Ceph RBD]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd/"/>
+    <updated>2016-04-14T14:10:12+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd</id>
+    <content type="html"><![CDATA[<p>FYI, the first RBD support has been added to LXC commands.</p>
+
+<h2>Example :</h2>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="c"># Install LXC 2.0.0 (ubuntu) :</span>
+</span><span class='line'><span class="nv">$ </span>add-apt-repository ppa:ubuntu-lxc/lxc-stable
+</span><span class='line'><span class="nv">$ </span>apt-get update
+</span><span class='line'><span class="nv">$ </span>apt-get install lxc
+</span><span class='line'>
+</span><span class='line'><span class="c"># Add a ceph pool for lxc bloc devices :</span>
+</span><span class='line'><span class="nv">$ </span>ceph osd pool create lxc 64 64
+</span><span class='line'>
+</span><span class='line'><span class="c"># To create the container, you only need to specify &quot;rbd&quot; backingstore :</span>
+</span><span class='line'><span class="nv">$ </span>lxc-create -n ctn1 -B rbd -t debian
+</span><span class='line'>/dev/rbd0
+</span><span class='line'>debootstrap est /usr/sbin/debootstrap
+</span><span class='line'>Checking cache download in /var/cache/lxc/debian/rootfs-jessie-amd64 ...
+</span><span class='line'>Copying rootfs to /usr/lib/x86_64-linux-gnu/lxc...
+</span><span class='line'>Generation complete.
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>rbd showmapped
+</span><span class='line'>id pool image snap device
+</span><span class='line'>0  lxc  ctn1  -    /dev/rbd0
+</span><span class='line'>
+</span><span class='line'><span class="nv">$ </span>rbd -p lxc info ctn1
+</span><span class='line'>rbd image <span class="s1">&#39;ctn1&#39;</span>:
+</span><span class='line'>  size 1024 MB in 256 objects
+</span><span class='line'>  order 22 <span class="o">(</span>4096 kB objects<span class="o">)</span>
+</span><span class='line'>  block_name_prefix: rb.0.1217d.74b0dc51
+</span><span class='line'>  format: 1
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>lxc-start -n ctn1
+</span><span class='line'><span class="nv">$ </span>lxc-attach -n ctn1
+</span><span class='line'>ctn1<span class="nv">$ </span>mount | grep <span class="s1">&#39; / &#39;</span>
+</span><span class='line'>/dev/rbd/lxc/ctn1 on / <span class="nb">type </span>ext3 <span class="o">(</span>rw,relatime,stripe<span class="o">=</span>1024,data<span class="o">=</span>ordered<span class="o">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>lxc-destroy -n ctn1
+</span><span class='line'>Removing image: 100% complete...done.
+</span><span class='line'>Destroyed container ctn1
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<!-- more -->
+
+
+<h2>Some options :</h2>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>--rbdpool POOL   : will create the blockdevice in the pool named POOL, rather than the default, which is <span class="s1">&#39;lxc&#39;</span>.
+</span><span class='line'>
+</span><span class='line'>--rbdname RBDNAME : will create a blockdevice named RBDNAME rather than the default, which is the container name.
+</span><span class='line'>
+</span><span class='line'>--fssize : Create a RBD of size SIZE * unit U <span class="o">(</span>bBkKmMgGtT<span class="o">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>For example :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">$ </span>lxc-create -n ctn2 -B rbd -t debian --rbdpool<span class="o">=</span>rbd --rbdname<span class="o">=</span>lxc-ctn2 --fssize<span class="o">=</span>2G
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>What is not yet done:</h2>
+
+<ul>
+<li>Persistence on reboot: (RBD can be optionally added to rbdmap file)</li>
+<li>Snapshots</li>
+<li>Params for authentication (user, keyring&hellip;)</li>
+<li>Other rbd options (format, &hellip;)</li>
+</ul>
+
+
+<p>The release annoucement :</p>
+
+<p><a href="https://linuxcontainers.org/fr/lxc/news/#lxc-200-release-announcement-6th-of-april-2016">https://linuxcontainers.org/fr/lxc/news/#lxc-200-release-announcement-6th-of-april-2016</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Downgrade LSI 9207 to P19 Firmware]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/08/13/downgrade-lsi-9207-to-p19-firmware/"/>
+    <updated>2015-08-13T10:48:31+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/08/13/downgrade-lsi-9207-to-p19-firmware</id>
+    <content type="html"><![CDATA[<p>After numerous problems encountered with the P20 firmware on this card model, here are the steps I followed to flash in P19 Version.</p>
+
+<p>Since, no more problems :)</p>
+
+<p>The model of the card is a LSI 9207-8i (SAS2308 controler) with IT FW:</p>
+
+<pre><code>lspci | grep LSI
+01:00.0 Serial Attached SCSI controller: LSI Logic / Symbios Logic SAS2308 PCI-Express Fusion-MPT SAS-2 (rev 05)
+</code></pre>
+
+<!--more-->
+
+
+<p>I use :</p>
+
+<ul>
+<li><p>Virtual Floppy Drive : <a href="http://sourceforge.net/projects/vfd/">http://sourceforge.net/projects/vfd/</a></p></li>
+<li><p>Freedos : <a href="http://www.fdos.org/bootdisks/autogen/FDOEM.144.gz">http://www.fdos.org/bootdisks/autogen/FDOEM.144.gz</a></p></li>
+<li><p>Installer P20 for UEFI : <a href="http://www.avagotech.com/products/server-storage/host-bus-adapters/sas-9207-8i#downloads">http://www.avagotech.com/products/server-storage/host-bus-adapters/sas-9207-8i#downloads</a></p></li>
+<li><p>9207_8i_Package_P19_IR_IT_Firmware_BIOS_for_MSDOS_Windows : <a href="http://www.avagotech.com/products/server-storage/host-bus-adapters/sas-9207-8i#downloads">http://www.avagotech.com/products/server-storage/host-bus-adapters/sas-9207-8i#downloads</a></p></li>
+</ul>
+
+
+<p>With VFD I create an new 2.88 MB floppy that contain :</p>
+
+<pre><code>KERNEL.SYS     from Freedos
+sys.com        from Freedos
+sas2flash.efi  from Installer P20 for UEFI
+mptsas2.rom    from 9207_8i_Package_P19_IR_IT_Firmware_BIOS_for_MSDOS_Windows
+9207-8.bin     from 9207_8i_Package_P19_IR_IT_Firmware_BIOS_for_MSDOS_Windows (IT firmware in my case)
+</code></pre>
+
+<p><img src="http://cephnotes.ksperis.com/images/lsi_P19_downgrade-0.png"></p>
+
+<p>Virtual Storage plugin on Supermicro to connect Drive B :</p>
+
+<p><img src="http://cephnotes.ksperis.com/images/lsi_P19_downgrade-1.png"></p>
+
+<p>Reboot server and press F11 on startup to access boot menu and start with Built-in EFI Shell.</p>
+
+<p><img src="http://cephnotes.ksperis.com/images/lsi_P19_downgrade-2.png"></p>
+
+<p>Go into floppy drive (fs0:, or fs1:, fs2:, &hellip;) and verify content :</p>
+
+<p><img src="http://cephnotes.ksperis.com/images/lsi_P19_downgrade-3.png"></p>
+
+<p>Before starting to flash, verify your card with <code>sas2flash -list</code>. If you have more than one controler you can specify the controler with <code>-c controler_id</code> for the next commands.</p>
+
+<p>Next, you will need to erase all the content of the card (to avoid error like &ldquo;Cannot downgrade NVDATA version&hellip;&rdquo;)</p>
+
+<pre><code>sas2flash -o -e 6
+</code></pre>
+
+<p><img src="http://cephnotes.ksperis.com/images/lsi_P19_downgrade-4.png"></p>
+
+<p>Flash with the new firmware and bios :</p>
+
+<pre><code>sas2flash -f 9207-8.bin -b mptsas2.rom
+</code></pre>
+
+<p><img src="http://cephnotes.ksperis.com/images/lsi_P19_downgrade-5.png">
+<img src="http://cephnotes.ksperis.com/images/lsi_P19_downgrade-6.png"></p>
+
+<p>Verify the new firmware version :</p>
+
+<p><img src="http://cephnotes.ksperis.com/images/lsi_P19_downgrade-7.png"></p>
+
+<p>To see the firmware version on OS :</p>
+
+<pre><code># sas2ircu 0 DISPLAY
+
+LSI Corporation SAS2 IR Configuration Utility.
+Version 16.00.00.00 (2013.03.01) 
+Copyright (c) 2009-2013 LSI Corporation. All rights reserved. 
+
+Read configuration has been initiated for controller 0
+------------------------------------------------------------------------
+Controller information
+------------------------------------------------------------------------
+  Controller type                         : SAS2308_2
+  BIOS version                            : 7.37.00.00
+  Firmware version                        : 19.00.00.00
+  Channel description                     : 1 Serial Attached SCSI
+  Initiator ID                            : 0
+  Maximum physical devices                : 1023
+  Concurrent commands supported           : 10240
+  Slot                                    : 16
+  Segment                                 : 0
+  Bus                                     : 1
+  Device                                  : 0
+  Function                                : 0
+  RAID Support                            : No
+...
+</code></pre>
+
+<p>SAS2Flash Utility Guide : <a href="http://www.lsi.com/sep/Documents/oracle/files/SAS2_Flash_Utility_Software_Ref_Guide.pdf">http://www.lsi.com/sep/Documents/oracle/files/SAS2_Flash_Utility_Software_Ref_Guide.pdf</a></p>
+
+<p>Thread &ldquo;Lots of trouble with LSI 9207-8e HBAs &ndash; Issue caused by LSI P20 92XX HBA Firmware&rdquo; <a href="https://community.nexenta.com/thread/1053">https://community.nexenta.com/thread/1053</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Get OMAP Key/value Size]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/06/25/get-omap-key-slash-value-size/"/>
+    <updated>2015-06-25T16:40:15+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/06/25/get-omap-key-slash-value-size</id>
+    <content type="html"><![CDATA[<p>List the total size of all keys for each object on a pool.</p>
+
+<pre><code>object        size_keys(kB)  size_values(kB)  total(kB)  nr_keys  nr_values
+meta.log.44   0              1                1          0        10
+data_log.78   0              56419            56419      0        406841
+meta.log.36   0              1                1          0        10
+data_log.71   0              56758            56758      0        409426
+data_log.111  0              56519            56519      0        405909
+...
+</code></pre>
+
+<!--more-->
+
+
+<p>This is based on the command <code>rados listomapvals</code>.</p>
+
+<pre><code>pool='.rgw.buckets.index'
+list=`rados -p $pool ls`
+
+(
+echo "object size_keys(kB) size_values(kB) total(kB) nr_keys nr_values"
+for obj in $list; do
+echo -en "$obj ";
+rados -p $pool listomapvals $obj | awk '
+/^key: \(.* bytes\)/ { sizekey+= substr($2, 2, length($2)); nbkeys++ }
+/^value: \(.* bytes\)/ { sizevalue+= substr($2, 2, length($2)); nbvalues++ }
+END { printf("%i %i %i %i %i\n", sizekey/1024, sizevalue/1024, (sizekey+sizevalue)/1024, nbkey, nbvalues) }
+'
+done
+)
+</code></pre>
+
+<p>The method is not really optimal, so it may take some time. But it helps to have an idea.</p>
+
+<p>You can add <code>| column -t</code> at the end of the command line for better display :</p>
+
+<pre><code>object                    size_keys(kB)  size_values(kB)  total(kB)  nr_keys  nr_values
+.dir.default.1970130.1.250   8863          75592           84455      0        538692
+.dir.default.1977514.4.161   6             55              61         0        405
+.dir.default.1977550.10.98   12            83              95         0        692
+.dir.default.1977550.5.83    47            434             482        0        3074
+.dir.default.1977550.11.34   0             1               2          0        15
+.dir.default.1970130.1.69    9147          78077           87224      0        556235
+.dir.default.1977550.8.116   0             0               0          0        3
+.dir.default.1977550.3.49    0             4               5          0        36
+.dir.default.1930743.19.0    0             0               0          0        0
+.dir.default.1985483.1.40    204           1868            2073       0        13261
+.dir.default.1977514.7.77    0             8               9          0        66
+.dir.default.1977514.2.74    0             8               9          0        66
+.dir.default.1977550.8.113   0             1               2          0        15
+.dir.default.1977550.4.121   7             40              47         0        351
+.dir.default.1977514.8.122   0             0               0          0        6
+.dir.default.1985483.2.148   578           5423            6001       0        38583
+...
+</code></pre>
+
+<p><a href="http://ceph.com/docs/master/man/8/rados/#pool-specific-commands">http://ceph.com/docs/master/man/8/rados/#pool-specific-commands</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[The Kernel 4.1 Is Out]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/06/22/the-kernel-4-dot-1-is-out/"/>
+    <updated>2015-06-22T11:16:21+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/06/22/the-kernel-4-dot-1-is-out</id>
+    <content type="html"><![CDATA[<p>This kernel version support all features for Hammer, in particular straw v2.</p>
+
+<p><a href="https://www.kernel.org/">https://www.kernel.org/</a></p>
+
+<!--more-->
+
+
+<p>The main changes in this version:</p>
+
+<pre><code>rbd: rbd_wq comment is obsolete
+libceph: announce support for straw2 buckets
+crush: straw2 bucket type with an efficient 64-bit crush_ln()
+crush: ensuring at most num-rep osds are selected
+crush: drop unnecessary include from mapper.c
+ceph: fix uninline data function
+ceph: rename snapshot support
+ceph: fix null pointer dereference in send_mds_reconnect()
+ceph: hold on to exclusive caps on complete directories
+libceph: simplify our debugfs attr macro
+ceph: show non-default options only
+libceph: expose client options through debugfs
+libceph, ceph: split ceph_show_options()
+rbd: mark block queue as non-rotational
+libceph: don't overwrite specific con error msgs
+ceph: cleanup unsafe requests when reconnecting is denied
+ceph: don't zero i_wrbuffer_ref when reconnecting is denied
+ceph: don't mark dirty caps when there is no auth cap
+ceph: keep i_snap_realm while there are writers
+libceph: osdmap.h: Add missing format newlines
+</code></pre>
+
+<p><a href="https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1204c464458e9837320a326a9fce550e3c5ef5de">https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=1204c464458e9837320a326a9fce550e3c5ef5de</a></p>
+
+<p><a href="http://cephnotes.ksperis.com/blog/2014/01/21/feature-set-mismatch-error-on-ceph-kernel-client">http://cephnotes.ksperis.com/blog/2014/01/21/feature-set-mismatch-error-on-ceph-kernel-client</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Add Support of Curl_multi_wait for RadosGW on Debian Wheezy]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/06/18/add-support-of-curl-multi-wait-for-radosgw-on-debian-wheezy/"/>
+    <updated>2015-06-18T17:42:39+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/06/18/add-support-of-curl-multi-wait-for-radosgw-on-debian-wheezy</id>
+    <content type="html"><![CDATA[<pre><code>WARNING: libcurl doesn't support curl_multi_wait()
+WARNING: cross zone / region transfer performance may be affected
+</code></pre>
+
+<p>If you have already been confronted to this error at startup of RadosGW, the problem is the version of libcurl used.
+To enable support of curl_multi_wait, you will need to compile radosgw with libcurl >= 7.28.0 :
+<a href="http://curl.haxx.se/libcurl/c/curl_multi_wait.html">http://curl.haxx.se/libcurl/c/curl_multi_wait.html</a></p>
+
+<!-- more -->
+
+
+<p>On debian wheezy, you can use ceph-extras repo which contains libcurl 7.29.0 to recompile ceph packages :</p>
+
+<pre><code># apt-cache policy libcurl4-gnutls-dev
+libcurl4-gnutls-dev:
+  Installed: (none)
+  Candidate: 7.26.0-1+wheezy13
+
+# echo  deb http://ceph.com/packages/ceph-extras/debian wheezy main | tee /etc/apt/sources.list.d/ceph-extras.list
+# apt-get update
+
+# apt-cache policy libcurl4-gnutls-dev
+libcurl4-gnutls-dev:
+  Installed: (none)
+  Candidate: 7.29.0-1~bpo70+1.ceph
+</code></pre>
+
+<p>Retrieve Ceph repo on Github (in this example, I use hammer version) :</p>
+
+<pre><code># apt-get install git build-essential automake
+# git clone --recursive https://github.com/ceph/ceph.git -b hammer
+# cd ceph
+</code></pre>
+
+<p>Install dependencies and build packages (without libbabeltrace-ctf-dev libbabeltrace-dev, here we not need&hellip;)</p>
+
+<pre><code># apt-get install autoconf automake autotools-dev libbz2-dev cryptsetup-bin debhelper default-jdk gdisk javahelper junit4 libaio-dev libatomic-ops-dev libblkid-dev libboost-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev libcurl4-gnutls-dev libedit-dev libexpat1-dev libfcgi-dev libfuse-dev libgoogle-perftools-dev libkeyutils-dev libleveldb-dev libnss3-dev libsnappy-dev liblttng-ust-dev libtool libudev-dev libxml2-dev parted pkg-config python-nose python-virtualenv sdparm uuid-dev uuid-runtime xfslibs-dev xfsprogs xmlstarlet yasm zlib1g-dev
+
+# dpkg-buildpackage -d
+</code></pre>
+
+<p>On RadosGW host, you will need to add &ldquo;ceph-extras&rdquo; repo (for libcurl) and install radosgw packages and dependencies :</p>
+
+<pre><code># echo  deb http://ceph.com/packages/ceph-extras/debian wheezy main | tee /etc/apt/sources.list.d/ceph-extras.list
+# apt-get update
+
+# dpkg -i ceph-common_*.deb librbd1_*.deb python-cephfs_*.deb python-rbd_*.deb librados2_*.deb python-ceph_*.deb python-rados_*.deb radosgw_*.deb
+</code></pre>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Intel 520 SSD Journal]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/05/19/intel-520-ssd-journal/"/>
+    <updated>2015-05-19T09:54:39+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/05/19/intel-520-ssd-journal</id>
+    <content type="html"><![CDATA[<p>A quick check of my Intel 520 SSD that running since 2 years on a small cluster.</p>
+
+<pre><code>smartctl -a /dev/sda
+=== START OF INFORMATION SECTION ===
+Model Family:     Intel 520 Series SSDs
+Device Model:     INTEL SSDSC2CW060A3
+Serial Number:    CVCV305200NB060AGN
+LU WWN Device Id: 5 001517 8f36af9db
+Firmware Version: 400i
+User Capacity:    60 022 480 896 bytes [60,0 GB]
+Sector Size:      512 bytes logical/physical
+
+ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE
+  5 Reallocated_Sector_Ct   0x0032   100   100   000    Old_age   Always       -       0
+  9 Power_On_Hours_and_Msec 0x0032   000   000   000    Old_age   Always       -       910315h+05m+29.420s
+ 12 Power_Cycle_Count       0x0032   100   100   000    Old_age   Always       -       13
+170 Available_Reservd_Space 0x0033   100   100   010    Pre-fail  Always       -       0
+171 Program_Fail_Count      0x0032   100   100   000    Old_age   Always       -       0
+172 Erase_Fail_Count        0x0032   100   100   000    Old_age   Always       -       0
+174 Unexpect_Power_Loss_Ct  0x0032   100   100   000    Old_age   Always       -       13
+184 End-to-End_Error        0x0033   100   100   090    Pre-fail  Always       -       0
+187 Uncorrectable_Error_Cnt 0x000f   117   117   050    Pre-fail  Always       -       153797776
+192 Power-Off_Retract_Count 0x0032   100   100   000    Old_age   Always       -       13
+225 Host_Writes_32MiB       0x0032   100   100   000    Old_age   Always       -       1367528
+226 Workld_Media_Wear_Indic 0x0032   100   100   000    Old_age   Always       -       65535
+227 Workld_Host_Reads_Perc  0x0032   100   100   000    Old_age   Always       -       3
+228 Workload_Minutes        0x0032   100   100   000    Old_age   Always       -       65535
+232 Available_Reservd_Space 0x0033   100   100   010    Pre-fail  Always       -       0
+233 Media_Wearout_Indicator 0x0032   093   093   000    Old_age   Always       -       0
+241 Host_Writes_32MiB       0x0032   100   100   000    Old_age   Always       -       1367528
+242 Host_Reads_32MiB        0x0032   100   100   000    Old_age   Always       -       56808
+249 NAND_Writes_1GiB        0x0013   100   100   000    Pre-fail  Always       -       33624
+</code></pre>
+
+<h2>9 &ndash; Power on hours count</h2>
+
+<p>Cluster started since 2 years.</p>
+
+<h2>170 Available_Reservd_Space</h2>
+
+<p>100%</p>
+
+<h2>174 &ndash; Unexpected power loss</h2>
+
+<p>13 => Due to power loss on cluster. Everything has always well restarted. :)</p>
+
+<h2>187 &ndash; Uncorrectable error count</h2>
+
+<p>? Limit Ok</p>
+
+<h2>233 Media Wearout Indicator</h2>
+
+<p>093 => progressively decrease, I do not know if it&rsquo;s completely reliable, but it is usually a good indicator.</p>
+
+<h2>241 &ndash; Host Writes 32MiB</h2>
+
+<p>1367528 => 42 Tb written by host
+This correspond to 60 GB per days for 3 osd. This seems normal.</p>
+
+<h2>249 &ndash; NAND Writes 1GiB</h2>
+
+<p>33624 => 33 Tb written on Nand
+write amplification = 0.79    That is pretty good.</p>
+
+<p>The drive is a 60.0 GB. This make each LBA written about 560 times.</p>
+
+<p>For clusters with a little more load, Intel DC S3700 models remains my favorite, but in my case the Intel 520 do very well their job.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[RadosGW Big Index]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/05/12/radosgw-big-index/"/>
+    <updated>2015-05-12T16:16:56+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/05/12/radosgw-big-index</id>
+    <content type="html"><![CDATA[<pre><code>$ rados -p .default.rgw.buckets.index listomapkeys .dir.default.1970130.1 | wc -l
+166768275
+</code></pre>
+
+<p>With each key containing between 100 and 250 bytes, this make a very big object for rados (several GB)&hellip; Especially when migrating it from an OSD to another (this will lock all writes), moreover, the OSD containing this object will use a lot of memory &hellip;</p>
+
+<p>Since the hammer release it is possible to shard the bucket index. However, you can not shard an existing one but you can setup it for new buckets.
+This is a very good thing for the scalability.</p>
+
+<!-- more -->
+
+
+<h2>Setting up index max shards</h2>
+
+<p>You can specify the default number of shards for new buckets :</p>
+
+<ul>
+<li>Per zone, in regionmap :</li>
+</ul>
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='json'><span class='line'><span class="err">$</span> <span class="err">radosgw-admin</span> <span class="err">region</span> <span class="err">get</span>
+</span><span class='line'><span class="err">...</span>
+</span><span class='line'><span class="s2">&quot;zones&quot;</span><span class="err">:</span> <span class="p">[</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+</span><span class='line'>        <span class="nt">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>            <span class="s2">&quot;http:\/\/storage.example.com:80\/&quot;</span>
+</span><span class='line'>        <span class="p">],</span>
+</span><span class='line'>        <span class="nt">&quot;log_meta&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span>
+</span><span class='line'>        <span class="nt">&quot;log_data&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span>
+</span><span class='line'>        <span class="nt">&quot;bucket_index_max_shards&quot;</span><span class="p">:</span> <span class="mi">8</span>             <span class="err">&lt;===</span>
+</span><span class='line'>    <span class="p">},</span>
+</span><span class='line'><span class="err">...</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<ul>
+<li>In in radosgw section in ceph.conf (this override the per zone value)</li>
+</ul>
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='json'><span class='line'><span class="err">...</span>
+</span><span class='line'><span class="p">[</span><span class="err">client.radosgw.gateway</span><span class="p">]</span>
+</span><span class='line'><span class="err">rgw</span> <span class="err">bucket</span> <span class="err">index</span> <span class="err">max</span> <span class="err">shards</span> <span class="err">=</span> <span class="mi">8</span>
+</span><span class='line'><span class="err">....</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>Verification :</h2>
+
+<pre><code>$ radosgw-admin metadata get bucket:mybucket | grep bucket_id
+            "bucket_id": "default.1970130.1"
+
+$ radosgw-admin metadata get bucket.instance:mybucket:default.1970130.1 | grep num_shards
+            "num_shards": 8,
+
+$ rados -p .rgw.buckets.index ls | grep default.1970130.1
+.dir.default.1970130.1.0
+.dir.default.1970130.1.1
+.dir.default.1970130.1.2
+.dir.default.1970130.1.3
+.dir.default.1970130.1.4
+.dir.default.1970130.1.5
+.dir.default.1970130.1.6
+.dir.default.1970130.1.7
+</code></pre>
+
+<h2>Bucket listing impact :</h2>
+
+<p>A simple test with ~200k objects in a bucket :</p>
+
+<table>
+<thead>
+<tr>
+<th align="left"> num_shard </th>
+<th align="left"> time (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">  0        </td>
+<td align="left"> 25</td>
+</tr>
+<tr>
+<td align="left">  8        </td>
+<td align="left"> 36</td>
+</tr>
+<tr>
+<td align="left">  128      </td>
+<td align="left"> 109</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>So, do not use buckets with thousands of shards if you do not need it, because the bucket listing will become very slow&hellip;</p>
+
+<p>Link to the blueprint :</p>
+
+<p><a href="https://wiki.ceph.com/Planning/Blueprints/Hammer/rgw%3A_bucket_index_scalability">https://wiki.ceph.com/Planning/Blueprints/Hammer/rgw%3A_bucket_index_scalability</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[OpenVZ: Kernel 3.10 With Rbd Module]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/05/04/openvz-kernel-3-dot-10-with-rbd-module/"/>
+    <updated>2015-05-04T12:06:19+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/05/04/openvz-kernel-3-dot-10-with-rbd-module</id>
+    <content type="html"><![CDATA[<p>3.X Kernel for OpenVZ is out and it is compiled with rbd module:</p>
+
+<pre><code>root@debian:~# uname -a
+Linux debian 3.10.0-3-pve #1 SMP Thu Jun 12 13:50:49 CEST 2014 x86_64 GNU/Linux
+
+root@debian:~# modinfo rbd
+filename:       /lib/modules/3.10.0-3-pve/kernel/drivers/block/rbd.ko
+license:        GPL
+author:         Jeff Garzik &lt;jeff@garzik.org&gt;
+description:    rados block device
+author:         Yehuda Sadeh &lt;yehuda@hq.newdream.net&gt;
+author:         Sage Weil &lt;sage@newdream.net&gt;
+srcversion:     F459625E3E9943C5880D8BE
+depends:        libceph
+intree:         Y
+vermagic:       3.10.0-3-pve SMP mod_unload modversions 
+</code></pre>
+
+<p>There will be new things to test &hellip;</p>
+
+<p>By default, no CephFS module.</p>
+
+<p>The announcement of the publication of the source code :
+<a href="http://lists.openvz.org/pipermail/announce/2015-April/000579.html">http://lists.openvz.org/pipermail/announce/2015-April/000579.html</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Ceph Pool Migration]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/04/15/ceph-pool-migration/"/>
+    <updated>2015-04-15T16:23:59+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/04/15/ceph-pool-migration</id>
+    <content type="html"><![CDATA[<p>You have probably already be faced to migrate all objects from a pool to another, especially to change parameters that can not be modified on pool. For example, to migrate from a replicated pool to an EC pool, change EC profile, or to reduce the number of PGs&hellip;
+There are different methods, depending on the contents of the pool (RBD, objects), size&hellip;</p>
+
+<h1>The simple way</h1>
+
+<p>The simplest and safest method to copy all objects with the &ldquo;rados cppool&rdquo; command.
+However, it need to have read only access to the pool during the copy.</p>
+
+<p>For example for migrating to an EC pool :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="nv">pool</span><span class="o">=</span>testpool
+</span><span class='line'>ceph osd pool create <span class="nv">$pool</span>.new 4096 4096 erasure default
+</span><span class='line'>rados cppool <span class="nv">$pool</span> <span class="nv">$pool</span>.new
+</span><span class='line'>ceph osd pool rename <span class="nv">$pool</span> <span class="nv">$pool</span>.old
+</span><span class='line'>ceph osd pool rename <span class="nv">$pool</span>.new <span class="nv">$pool</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>But it does not work in all cases. For example with EC pools : &ldquo;error copying pool testpool => newpool: (95) Operation not supported&rdquo;.</p>
+
+<h1>Using Cache Tier</h1>
+
+<p><strong>This must to be used with caution, make tests before using it on a cluster in production. It worked for my needs, but I can not say that it works in all cases.</strong></p>
+
+<p>I find this method interesting method, because it allows transparent operation, reduce downtime and avoid to duplicate all data. The principle is simple: use the cache tier, but in reverse order.</p>
+
+<p>At the begning, we have 2 pools : the current &ldquo;testpool&rdquo;, and the new one &ldquo;newpool&rdquo;</p>
+
+<p><img src="http://cephnotes.ksperis.com/images/pool_migration-1.png"></p>
+
+<h2>Setup cache tier</h2>
+
+<p>Configure the existing pool as cache pool :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>ceph osd tier add newpool testpool --force-nonempty
+</span><span class='line'>ceph osd tier cache-mode testpool forward
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>In <code>ceph osd dump</code> you should see something like that :</p>
+
+<pre><code>--&gt; pool 58 'testpool' replicated size 3 .... tier_of 80 
+</code></pre>
+
+<p>Now, all new objects will be create on new pool :</p>
+
+<p><img src="http://cephnotes.ksperis.com/images/pool_migration-2.png"></p>
+
+<p>Now we can force to move all objects to new pool :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>rados -p testpool cache-flush-evict-all
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><img src="http://cephnotes.ksperis.com/images/pool_migration-3.png"></p>
+
+<h2>Switch all clients to the new pool</h2>
+
+<p>(You can also do this step earlier. For example, just after the cache pool creation.)
+Until all the data has not been flushed to the new pool you need to specify an overlay to search objects on old pool :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>ceph osd tier <span class="nb">set</span>-overlay newpool testpool
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>In <code>ceph osd dump</code> you should see something like that :</p>
+
+<pre><code>--&gt; pool 80 'newpool' replicated size 3 .... tiers 58 read_tier 58 write_tier 58
+</code></pre>
+
+<p>With overlay, all operation will be forwarded to the old testpool :</p>
+
+<p><img src="http://cephnotes.ksperis.com/images/pool_migration-4.png"></p>
+
+<p>Now you can switch all the clients to access objects on the new pool.</p>
+
+<h2>Finish</h2>
+
+<p>When all data is migrate, you can remove overlay and old &ldquo;cache&rdquo; pool :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>ceph osd tier remove-overlay newpool
+</span><span class='line'>ceph osd tier remove newpool testpool
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><img src="http://cephnotes.ksperis.com/images/pool_migration-5.png"></p>
+
+<!-- more -->
+
+
+<h2>In-use object</h2>
+
+<p>During eviction you can find some error :</p>
+
+<pre><code>....
+rb.0.59189e.2ae8944a.000000000001   
+rb.0.59189e.2ae8944a.000000000023   
+rb.0.59189e.2ae8944a.000000000006   
+testrbd.rbd 
+failed to evict testrbd.rbd: (16) Device or resource busy
+rb.0.59189e.2ae8944a.000000000000   
+rb.0.59189e.2ae8944a.000000000026   
+...
+</code></pre>
+
+<p>List watcher on object can help :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>rados -p testpool listwatchers testrbd.rbd
+</span><span class='line'><span class="nv">watcher</span><span class="o">=</span>10.20.6.39:0/3318181122 client.5520194 <span class="nv">cookie</span><span class="o">=</span>1
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h1>Using Rados Export/Import</h1>
+
+<p>For this, you need to use a temporary local directory.</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>rados <span class="nb">export</span> --create testpool tmp_dir
+</span><span class='line'><span class="o">[</span>exported<span class="o">]</span>     rb.0.4975.2ae8944a.000000002391
+</span><span class='line'><span class="o">[</span>exported<span class="o">]</span>     rb.0.4975.2ae8944a.000000004abc
+</span><span class='line'><span class="o">[</span>exported<span class="o">]</span>     rb.0.4975.2ae8944a.0000000018ce
+</span><span class='line'>...
+</span><span class='line'>
+</span><span class='line'>rados import tmp_dir newpool
+</span><span class='line'>
+</span><span class='line'><span class="c"># Stop All IO</span>
+</span><span class='line'><span class="c"># And redo a sync of modified objects</span>
+</span><span class='line'>
+</span><span class='line'>rados <span class="nb">export</span> --workers 5 testpool tmp_dir
+</span><span class='line'>rados import --workers 5 tmp_dir newpool
+</span></code></pre></td></tr></table></div></figure>
+
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[RadosGW: Simple Replication Example]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/03/13/radosgw-simple-replication-example/"/>
+    <updated>2015-03-13T16:20:29+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/03/13/radosgw-simple-replication-example</id>
+    <content type="html"><![CDATA[<p>This is a simple example of federated gateways config to make an asynchonous replication between two Ceph clusters.</p>
+
+<p><img src="http://cephnotes.ksperis.com/images/simple_example_radosgw-agent.png"></p>
+
+<!-- more -->
+
+
+<p>(Update Nov. 2016 : Since Jewel version, radosgw-agent is no more needed and active-active replication between zone is now supported. See here : <a href="http://docs.ceph.com/docs/jewel/radosgw/multisite/">http://docs.ceph.com/docs/jewel/radosgw/multisite/</a>)</p>
+
+<p>( The configuration below is using radosgw-agent and is based on Ceph documentation :
+<a href="http://docs.ceph.com/docs/hammer/radosgw/federated-config/">http://docs.ceph.com/docs/hammer/radosgw/federated-config/</a> )</p>
+
+<p>Here I use only one region (&ldquo;default&rdquo;) and two zones (&ldquo;main&rdquo; and &ldquo;fallback&rdquo;), one for each cluster.</p>
+
+<p>Note that in this example, I use 3 placement targets (default, hot, cold) that correspond respectively on pool .main.rgw.buckets, .main.rgw.hot.buckets, .main.rgw.cold.buckets.
+Be carefull to replace the tags {MAIN_USER_ACCESS}, {MAIN_USER_SECRET}, {FALLBACK_USER_ACESS}, {FALLBACK_USER_SECRET} by corresponding values.</p>
+
+<p>First I created region and zones files, that will be require on the 2 clusters :</p>
+
+<p>The region file &ldquo;region.conf.json&rdquo; :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='json'><span class='line'><span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;api_name&quot;</span><span class="p">:</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;is_master&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>        <span class="s2">&quot;http:\/\/s3.mydomain.com:80\/&quot;</span><span class="p">],</span>
+</span><span class='line'>  <span class="nt">&quot;master_zone&quot;</span><span class="p">:</span> <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;zones&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>                <span class="s2">&quot;http:\/\/s3.mydomain.com:80\/&quot;</span><span class="p">],</span>
+</span><span class='line'>          <span class="nt">&quot;log_meta&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;log_data&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;fallback&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;endpoints&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>                <span class="s2">&quot;http:\/\/s3-fallback.mydomain.com:80\/&quot;</span><span class="p">],</span>
+</span><span class='line'>          <span class="nt">&quot;log_meta&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;log_data&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">}],</span>
+</span><span class='line'>  <span class="nt">&quot;placement_targets&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;default-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;cold-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;hot-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[]}],</span>
+</span><span class='line'>  <span class="nt">&quot;default_placement&quot;</span><span class="p">:</span> <span class="s2">&quot;default-placement&quot;</span><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>a zone file &ldquo;zone-main.conf.json&rdquo; :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+</pre></td><td class='code'><pre><code class='json'><span class='line'><span class="p">{</span> <span class="nt">&quot;domain_root&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.domain.rgw&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;control_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.control&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;gc_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.gc&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.log&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;intent_log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.intent-log&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;usage_log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.usage&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_keys_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.users&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_email_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.users.email&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_swift_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.users.swift&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_uid_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.users.uid&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;system_key&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span class='line'>      <span class="nt">&quot;access_key&quot;</span><span class="p">:</span> <span class="s2">&quot;{MAIN_USER_ACCESS}&quot;</span><span class="p">,</span>
+</span><span class='line'>      <span class="nt">&quot;secret_key&quot;</span><span class="p">:</span> <span class="s2">&quot;{MAIN_USER_SECRET}&quot;</span><span class="p">},</span>
+</span><span class='line'>  <span class="nt">&quot;placement_pools&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;default-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;val&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;index_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.buckets.index&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.buckets&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_extra_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.buckets.extra&quot;</span><span class="p">}},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;cold-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;val&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;index_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.buckets.index&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.cold.buckets&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_extra_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.buckets.extra&quot;</span><span class="p">}},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;hot-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;val&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;index_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.buckets.index&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.hot.buckets&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_extra_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.main.rgw.buckets.extra&quot;</span><span class="p">}}]}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>And a zone file &ldquo;zone-fallback.conf.json&rdquo; :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class='json'><span class='line'><span class="p">{</span> <span class="nt">&quot;domain_root&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.domain.rgw&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;control_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.control&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;gc_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.gc&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.log&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;intent_log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.intent-log&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;usage_log_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.usage&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_keys_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.users&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_email_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.users.email&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_swift_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.users.swift&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;user_uid_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.users.uid&quot;</span><span class="p">,</span>
+</span><span class='line'>  <span class="nt">&quot;system_key&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span class='line'>    <span class="nt">&quot;access_key&quot;</span><span class="p">:</span> <span class="s2">&quot;{FALLBACK_USER_ACESS}&quot;</span><span class="p">,</span>
+</span><span class='line'>    <span class="nt">&quot;secret_key&quot;</span><span class="p">:</span> <span class="s2">&quot;{FALLBACK_USER_SECRET}&quot;</span>
+</span><span class='line'>         <span class="p">},</span>
+</span><span class='line'>  <span class="nt">&quot;placement_pools&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;default-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;val&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;index_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.buckets.index&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.buckets&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_extra_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.buckets.extra&quot;</span><span class="p">}},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;cold-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;val&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;index_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.buckets.index&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.cold.buckets&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_extra_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.buckets.extra&quot;</span><span class="p">}},</span>
+</span><span class='line'>        <span class="p">{</span> <span class="nt">&quot;key&quot;</span><span class="p">:</span> <span class="s2">&quot;hot-placement&quot;</span><span class="p">,</span>
+</span><span class='line'>          <span class="nt">&quot;val&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&quot;index_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.buckets.index&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.hot.buckets&quot;</span><span class="p">,</span>
+</span><span class='line'>              <span class="nt">&quot;data_extra_pool&quot;</span><span class="p">:</span> <span class="s2">&quot;.fallback.rgw.buckets.extra&quot;</span><span class="p">}}]}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>On first cluster (MAIN)</h2>
+
+<p>I created the pools :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>ceph osd pool create .rgw.root 16 16
+</span><span class='line'>ceph osd pool create .main.rgw.root 16 16
+</span><span class='line'>ceph osd pool create .main.domain.rgw 16 16
+</span><span class='line'>ceph osd pool create .main.rgw.control 16 16
+</span><span class='line'>ceph osd pool create .main.rgw.gc 16 16
+</span><span class='line'>ceph osd pool create .main.rgw.buckets 512 512
+</span><span class='line'>ceph osd pool create .main.rgw.hot.buckets 512 512
+</span><span class='line'>ceph osd pool create .main.rgw.cold.buckets 512 512
+</span><span class='line'>ceph osd pool create .main.rgw.buckets.index 32 32
+</span><span class='line'>ceph osd pool create .main.rgw.buckets.extra 16 16
+</span><span class='line'>ceph osd pool create .main.log 16 16
+</span><span class='line'>ceph osd pool create .main.intent-log 16 16
+</span><span class='line'>ceph osd pool create .main.usage 16 16
+</span><span class='line'>ceph osd pool create .main.users 16 16
+</span><span class='line'>ceph osd pool create .main.users.email 16 16
+</span><span class='line'>ceph osd pool create .main.users.swift 16 16
+</span><span class='line'>ceph osd pool create .main.users.uid 16 16
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>I configured region, zone, and add system users :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>  radosgw-admin region <span class="nb">set</span> --name client.radosgw.main &lt; region.conf.json
+</span><span class='line'>  radosgw-admin zone <span class="nb">set</span> --rgw-zone<span class="o">=</span>main --name client.radosgw.main &lt; zone-main.conf.json
+</span><span class='line'>  radosgw-admin zone <span class="nb">set</span> --rgw-zone<span class="o">=</span>fallback --name client.radosgw.main &lt; zone-fallback.conf.json
+</span><span class='line'>  radosgw-admin regionmap update --name client.radosgw.main
+</span><span class='line'>
+</span><span class='line'>  radosgw-admin user create --uid<span class="o">=</span><span class="s2">&quot;main&quot;</span> --display-name<span class="o">=</span><span class="s2">&quot;Zone main&quot;</span> --name client.radosgw.main --system --access-key<span class="o">={</span>MAIN_USER_ACCESS<span class="o">}</span> --secret<span class="o">={</span>MAIN_USER_SECRET<span class="o">}</span>
+</span><span class='line'>  radosgw-admin user create --uid<span class="o">=</span><span class="s2">&quot;fallback&quot;</span> --display-name<span class="o">=</span><span class="s2">&quot;Zone fallback&quot;</span> --name client.radosgw.main --system --access-key<span class="o">={</span>FALLBACK_USER_ACESS<span class="o">}</span> --secret<span class="o">={</span>FALLBACK_USER_SECRET<span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Setup RadosGW Config in ceph.conf on cluster MAIN :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>  <span class="o">[</span>client.radosgw.main<span class="o">]</span>
+</span><span class='line'>  <span class="nv">host</span> <span class="o">=</span> ceph-main-radosgw-01
+</span><span class='line'>  rgw <span class="nv">region</span> <span class="o">=</span> default
+</span><span class='line'>  rgw region root <span class="nv">pool</span> <span class="o">=</span> .rgw.root
+</span><span class='line'>  rgw <span class="nv">zone</span> <span class="o">=</span> main
+</span><span class='line'>  rgw zone root <span class="nv">pool</span> <span class="o">=</span> .main.rgw.root
+</span><span class='line'>  rgw <span class="nv">frontends</span> <span class="o">=</span> <span class="s2">&quot;civetweb port=80&quot;</span>
+</span><span class='line'>  rgw dns <span class="nv">name</span> <span class="o">=</span> s3.mydomain.com
+</span><span class='line'>  <span class="nv">keyring</span> <span class="o">=</span> /etc/ceph/ceph.client.radosgw.keyring
+</span><span class='line'>  <span class="nv">rgw_socket_path</span> <span class="o">=</span> /var/run/ceph/radosgw.sock
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>I needed to create keyring for [client.radosgw.main] in /etc/ceph/ceph.client.radosgw.keyring, see documentation.</p>
+
+<p>Then, start/restart radosgw for cluster MAIN.</p>
+
+<h2>On the other Ceph cluster (FALLBACK)</h2>
+
+<p>I created the pools :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>ceph osd pool create .rgw.root 16 16
+</span><span class='line'>ceph osd pool create .fallback.rgw.root 16 16
+</span><span class='line'>ceph osd pool create .fallback.domain.rgw 16 16
+</span><span class='line'>ceph osd pool create .fallback.rgw.control 16 16
+</span><span class='line'>ceph osd pool create .fallback.rgw.gc 16 16
+</span><span class='line'>ceph osd pool create .fallback.rgw.buckets 512 512
+</span><span class='line'>ceph osd pool create .fallback.rgw.hot.buckets 512 512
+</span><span class='line'>ceph osd pool create .fallback.rgw.cold.buckets 512 512
+</span><span class='line'>ceph osd pool create .fallback.rgw.buckets.index 32 32
+</span><span class='line'>ceph osd pool create .fallback.rgw.buckets.extra 16 16
+</span><span class='line'>ceph osd pool create .fallback.log 16 16
+</span><span class='line'>ceph osd pool create .fallback.intent-log 16 16
+</span><span class='line'>ceph osd pool create .fallback.usage 16 16
+</span><span class='line'>ceph osd pool create .fallback.users 16 16
+</span><span class='line'>ceph osd pool create .fallback.users.email 16 16
+</span><span class='line'>ceph osd pool create .fallback.users.swift 16 16
+</span><span class='line'>ceph osd pool create .fallback.users.uid 16 16
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>I configured region, zone, and add system users :</p>
+
+<pre><code>radosgw-admin region set --name client.radosgw.fallback &lt; region.conf.json
+radosgw-admin zone set --rgw-zone=fallback --name client.radosgw.fallback &lt; zone-fallback.conf.json
+radosgw-admin zone set --rgw-zone=main --name client.radosgw.fallback &lt; zone-main.conf.json
+radosgw-admin regionmap update --name client.radosgw.fallback
+
+radosgw-admin user create --uid="fallback" --display-name="Zone fallback" --name client.radosgw.fallback --system --access-key={FALLBACK_USER_ACESS} --secret={FALLBACK_USER_SECRET}
+radosgw-admin user create --uid="main" --display-name="Zone main" --name client.radosgw.fallback --system --access-key={MAIN_USER_ACCESS} --secret={MAIN_USER_SECRET}
+</code></pre>
+
+<p>Setup RadosGW Config in ceph.conf on cluster FALLBACK :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'><span class="o">[</span>client.radosgw.fallback<span class="o">]</span>
+</span><span class='line'><span class="nv">host</span> <span class="o">=</span> ceph-fallback-radosgw-01
+</span><span class='line'>rgw <span class="nv">region</span> <span class="o">=</span> default
+</span><span class='line'>rgw region root <span class="nv">pool</span> <span class="o">=</span> .rgw.root
+</span><span class='line'>rgw <span class="nv">zone</span> <span class="o">=</span> fallback
+</span><span class='line'>rgw zone root <span class="nv">pool</span> <span class="o">=</span> .fallback.rgw.root
+</span><span class='line'>rgw <span class="nv">frontends</span> <span class="o">=</span> <span class="s2">&quot;civetweb port=80&quot;</span>
+</span><span class='line'>rgw dns <span class="nv">name</span> <span class="o">=</span> s3-fallback.mydomain.com
+</span><span class='line'><span class="nv">keyring</span> <span class="o">=</span> /etc/ceph/ceph.client.radosgw.keyring
+</span><span class='line'><span class="nv">rgw_socket_path</span> <span class="o">=</span> /var/run/ceph/radosgw.sock
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Also, I needed to create keyring for [client.radosgw.fallback] in /etc/ceph/ceph.client.radosgw.keyring and start radosgw for cluster FALLBACK.</p>
+
+<h2>Finally setup the RadosGW Agent</h2>
+
+<p>/etc/ceph/radosgw-agent/default.conf :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>src_zone: main
+</span><span class='line'><span class="nb">source</span>: http://s3.mydomain.com:80
+</span><span class='line'>src_access_key: <span class="o">{</span>MAIN_USER_ACCESS<span class="o">}</span>
+</span><span class='line'>src_secret_key: <span class="o">{</span>MAIN_USER_SECRET<span class="o">}</span>
+</span><span class='line'>dest_zone: fallback
+</span><span class='line'>destination: http://s3-fallback.mydomain.com:80
+</span><span class='line'>dest_access_key: <span class="o">{</span>FALLBACK_USER_ACESS<span class="o">}</span>
+</span><span class='line'>dest_secret_key: <span class="o">{</span>FALLBACK_USER_SECRET<span class="o">}</span>
+</span><span class='line'>log_file: /var/log/radosgw/radosgw-sync.log
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='bash'><span class='line'>/etc/init.d/radosgw-agent start
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>After that, he still has a little suspense &hellip;
+Then I try to create a bucket with data on s3.mydomain.com and verify that, it&rsquo;s well synchronized.</p>
+
+<p>for debug, you can enable logs on the RadosGW on each side, and start radosgw-agent with radosgw-agent -v -c /etc/ceph/radosgw-agent/default.conf</p>
+
+<p>These steps work for me. The establishment is sometimes not obvious. Whenever I setup a sync it rarely works the first time, but it always ends up running.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Get the Number of Placement Groups Per Osd]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/"/>
+    <updated>2015-02-23T17:53:51+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd</id>
+    <content type="html"><![CDATA[<p>Get the PG distribution per osd in command line :</p>
+
+<pre><code>pool :  0   1   2   3   | SUM 
+------------------------------------------------
+osd.10  6   6   6   84  | 102
+osd.11  7   6   6   76  | 95
+osd.12  4   4   3   56  | 67
+osd.20  5   5   5   107 | 122
+osd.13  3   3   3   73  | 82
+osd.21  9   10  10  110 | 139
+osd.14  3   3   3   85  | 94
+osd.15  6   6   6   87  | 105
+osd.22  6   6   5   87  | 104
+osd.23  10  10  10  87  | 117
+osd.16  7   7   7   102 | 123
+osd.17  5   5   5   99  | 114
+osd.18  4   4   4   103 | 115
+osd.19  7   7   7   112 | 133
+osd.0   5   5   5   72  | 87
+osd.1   5   5   6   83  | 99
+osd.2   3   3   3   74  | 83
+osd.3   5   5   5   61  | 76
+osd.4   3   3   4   76  | 86
+osd.5   5   5   5   78  | 93
+osd.6   3   2   2   78  | 85
+osd.7   3   3   3   88  | 97
+osd.8   9   9   9   91  | 118
+osd.9   5   6   6   79  | 96
+------------------------------------------------
+SUM :   128 128 128 2048    |
+</code></pre>
+
+<!--more-->
+
+
+<p>The command :</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>ceph pg dump | awk '
+</span><span class='line'>BEGIN { IGNORECASE = 1 }
+</span><span class='line'> /^PG_STAT/ { col=1; while($col!="UP") {col++}; col++ }
+</span><span class='line'> /^[0-9a-f]+\.[0-9a-f]+/ { match($0,/^[0-9a-f]+/); pool=substr($0, RSTART, RLENGTH); poollist[pool]=0;
+</span><span class='line'> up=$col; i=0; RSTART=0; RLENGTH=0; delete osds; while(match(up,/[0-9]+/)&gt;0) { osds[++i]=substr(up,RSTART,RLENGTH); up = substr(up, RSTART+RLENGTH) }
+</span><span class='line'> for(i in osds) {array[osds[i],pool]++; osdlist[osds[i]];}
+</span><span class='line'>}
+</span><span class='line'>END {
+</span><span class='line'> printf("\n");
+</span><span class='line'> printf("pool :\t"); for (i in poollist) printf("%s\t",i); printf("| SUM \n");
+</span><span class='line'> for (i in poollist) printf("--------"); printf("----------------\n");
+</span><span class='line'> for (i in osdlist) { printf("osd.%i\t", i); sum=0;
+</span><span class='line'>   for (j in poollist) { printf("%i\t", array[i,j]); sum+=array[i,j]; sumpool[j]+=array[i,j] }; printf("| %i\n",sum) }
+</span><span class='line'> for (i in poollist) printf("--------"); printf("----------------\n");
+</span><span class='line'> printf("SUM :\t"); for (i in poollist) printf("%s\t",sumpool[i]); printf("|\n");
+</span><span class='line'>}'</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Copy-paste should work directly.
+The sum at bottom of the table must match to (pg_num x size).</p>
+
+<p>You can find pg_num recommandations here :
+<a href="http://ceph.com/docs/master/rados/operations/placement-groups/">http://ceph.com/docs/master/rados/operations/placement-groups/</a></p>
+
+<p>Also, a pg_num Calculator is avaible here :
+<a href="http://ceph.com/pgcalc">http://ceph.com/pgcalc</a></p>
+
+<p>To view the number of pg per osd :
+<a href="http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/">http://cephnotes.ksperis.com/blog/2015/02/23/get-the-number-of-placement-groups-per-osd/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[CRUSHMAP : Example of a Hierarchical Cluster Map]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/02/02/crushmap-example-of-a-hierarchical-cluster-map/"/>
+    <updated>2015-02-02T22:10:43+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/02/02/crushmap-example-of-a-hierarchical-cluster-map</id>
+    <content type="html"><![CDATA[<p>It is not always easy to know how to organize your data in the Crushmap, especially when trying to distribute the data geographically while separating different types of discs, eg SATA, SAS and SSD.
+Let&rsquo;s see what we can imagine as Crushmap hierarchy.</p>
+
+<p>Take a simple example of a distribution on two datacenters.
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-1.png">
+(Model 1.1)</p>
+
+<!--more-->
+
+
+<p>With the introduction of cache pools we can easily imagine adding ssd drives to our cluster. Take the example of ssd added on new hosts. We then left with two types of disks to manage. In a hierarchy that only describing the physical division of the cluster, we would end up with this type of hierarchy:
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-2.png">
+(Model 1.2)</p>
+
+<p>However, we soon realized that this configuration does not allow to separate the types of discs for use in a specific pool.</p>
+
+<p>To separate these discs and organize Crushmap, the simplest method is still to duplicate the tree from the root.
+Thus we get two points entered &ldquo;default&rdquo; (that could be rename &ldquo;hdd&rdquo;) and &ldquo;ssd&rdquo;.
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-3.1.png">
+An other example with hdd and ssd mixed on same hardware (you need to split each host) :
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-3.2.png">
+(Model 1.3)</p>
+
+<p>The problem is that we have segmented all the cluster by drive type. It was therefore no more entry point into our tree to select any disk in &ldquo;dc-1&rdquo; or in &ldquo;dc-2&rdquo;.
+For example, we can no longer define a rule to store data on a specific data center regardless of the type of disc.</p>
+
+<p>What we can do is add other entry points to the root level. For example, to permit access all drives :
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-4.png">
+(Model 1.4)</p>
+
+<p>If we wants to keep a certain logic in the tree, it is also possible to add more levels, some more &ldquo;logical&rdquo; for exemple for disks types, and other that represent physical distribution.
+They can be placed wherever we want and named as we wish. For example, here I added the level &ldquo;pool&rdquo; that one could also have called &ldquo;type&rdquo; or otherwise.
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-5.1.png">
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-5.2.png">
+(Model 1.5)</p>
+
+<p>Ok, it works, but it is difficult to read. Moreover, it becomes unreadable when the SSD and HDD are mixed on the same hosts as it involves duplicating each host.
+Also, there is no more physical data placement logic. We can try to insert a level between HOST and OSD:
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-6.png">
+(Model 1.6)</p>
+
+<p>Ok, it may be advantageous in the case of a small cluster, or in the case where there is no need for other levels.
+Let&rsquo;s try something else, we can also try using another organization, such as separating the osd in different levels and use that in the specific rules.
+For examble, have <code>step chooseleaf firstn 5 type host-sata</code> to select sata drive, and <code>step chooseleaf firstn 5 type host-ssd</code> to select ssd drive.
+<img src="http://cephnotes.ksperis.com/images/crushmap-tree-7.png">
+(Model 1.7)</p>
+
+<p>But this do NOT WORK. Indeed, the algorithm will try to take an OSD in each branch of the tree. If no OSD is found, it will try again to retrace. But this operation is quite random, and you can easily end up with insufficient replications.</p>
+
+<p>Make the test of this with this crushmap :</p>
+
+<ul>
+<li><p>1 rule for select one ssd on each DC</p></li>
+<li><p>1 rule for select one sata on each DC</p></li>
+<li><p>1 rule for select one sata on 2 diffrents hosts</p></li>
+</ul>
+
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+<span class='line-number'>101</span>
+<span class='line-number'>102</span>
+<span class='line-number'>103</span>
+<span class='line-number'>104</span>
+<span class='line-number'>105</span>
+<span class='line-number'>106</span>
+<span class='line-number'>107</span>
+<span class='line-number'>108</span>
+<span class='line-number'>109</span>
+<span class='line-number'>110</span>
+<span class='line-number'>111</span>
+<span class='line-number'>112</span>
+<span class='line-number'>113</span>
+<span class='line-number'>114</span>
+<span class='line-number'>115</span>
+<span class='line-number'>116</span>
+<span class='line-number'>117</span>
+<span class='line-number'>118</span>
+<span class='line-number'>119</span>
+<span class='line-number'>120</span>
+<span class='line-number'>121</span>
+<span class='line-number'>122</span>
+<span class='line-number'>123</span>
+<span class='line-number'>124</span>
+<span class='line-number'>125</span>
+<span class='line-number'>126</span>
+<span class='line-number'>127</span>
+<span class='line-number'>128</span>
+<span class='line-number'>129</span>
+<span class='line-number'>130</span>
+<span class='line-number'>131</span>
+<span class='line-number'>132</span>
+<span class='line-number'>133</span>
+<span class='line-number'>134</span>
+<span class='line-number'>135</span>
+<span class='line-number'>136</span>
+<span class='line-number'>137</span>
+<span class='line-number'>138</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'># begin crush map
+</span><span class='line'>tunable choose_local_tries 0
+</span><span class='line'>tunable choose_local_fallback_tries 0
+</span><span class='line'>tunable choose_total_tries 50
+</span><span class='line'>tunable chooseleaf_descend_once 0
+</span><span class='line'>tunable chooseleaf_vary_r 0
+</span><span class='line'>
+</span><span class='line'># devices
+</span><span class='line'>device 0 osd.0
+</span><span class='line'>device 1 osd.1
+</span><span class='line'>device 2 osd.2
+</span><span class='line'>device 3 osd.3
+</span><span class='line'>device 4 osd.4
+</span><span class='line'>device 5 osd.5
+</span><span class='line'>device 6 osd.6
+</span><span class='line'>device 7 osd.7
+</span><span class='line'>device 8 osd.8
+</span><span class='line'>device 9 osd.9
+</span><span class='line'>device 10 osd.10
+</span><span class='line'>device 11 osd.11
+</span><span class='line'>device 12 osd.12
+</span><span class='line'>device 13 osd.13
+</span><span class='line'>device 14 osd.14
+</span><span class='line'>device 15 osd.15
+</span><span class='line'>device 16 osd.16
+</span><span class='line'>device 17 osd.17
+</span><span class='line'>device 18 osd.18
+</span><span class='line'>
+</span><span class='line'># types
+</span><span class='line'>type 0 osd
+</span><span class='line'>type 1 host-ssd
+</span><span class='line'>type 2 host-sata
+</span><span class='line'>type 3 datacenter
+</span><span class='line'>type 4 root
+</span><span class='line'>
+</span><span class='line'># buckets
+</span><span class='line'>host-sata host-01 {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item osd.1 weight 1.000
+</span><span class='line'>  item osd.2 weight 1.000
+</span><span class='line'>  item osd.3 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>host-sata host-02 {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item osd.4 weight 1.000
+</span><span class='line'>  item osd.5 weight 1.000
+</span><span class='line'>  item osd.6 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>host-sata host-03 {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item osd.7 weight 1.000
+</span><span class='line'>  item osd.8 weight 1.000
+</span><span class='line'>  item osd.9 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>host-sata host-04 {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item osd.10 weight 1.000
+</span><span class='line'>  item osd.11 weight 1.000
+</span><span class='line'>  item osd.12 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>host-ssd host-05 {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item osd.13 weight 1.000
+</span><span class='line'>  item osd.14 weight 1.000
+</span><span class='line'>  item osd.15 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>host-ssd host-06 {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item osd.16 weight 1.000
+</span><span class='line'>  item osd.17 weight 1.000
+</span><span class='line'>  item osd.18 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>datacenter dc1 {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item host-01 weight 1.000
+</span><span class='line'>  item host-02 weight 1.000
+</span><span class='line'>  item host-05 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>datacenter dc2 {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item host-03 weight 1.000
+</span><span class='line'>  item host-04 weight 1.000
+</span><span class='line'>  item host-06 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>root default {
+</span><span class='line'>  alg straw
+</span><span class='line'>  hash 0
+</span><span class='line'>  item dc1 weight 1.000
+</span><span class='line'>  item dc2 weight 1.000
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'># rules
+</span><span class='line'>
+</span><span class='line'>rule sata-rep_2dc {
+</span><span class='line'>  ruleset 0
+</span><span class='line'>  type replicated
+</span><span class='line'>  min_size 2
+</span><span class='line'>  max_size 2
+</span><span class='line'>  step take default
+</span><span class='line'>  step choose firstn 0 type datacenter
+</span><span class='line'>  step chooseleaf firstn 1 type host-sata
+</span><span class='line'>  step emit
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>rule ssd-rep_2dc {
+</span><span class='line'>  ruleset 1
+</span><span class='line'>  type replicated
+</span><span class='line'>  min_size 2
+</span><span class='line'>  max_size 2
+</span><span class='line'>  step take default
+</span><span class='line'>  step choose firstn 0 type datacenter
+</span><span class='line'>  step chooseleaf firstn 1 type host-ssd
+</span><span class='line'>  step emit
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>rule sata-all {
+</span><span class='line'>  ruleset 2
+</span><span class='line'>  type replicated
+</span><span class='line'>  min_size 2
+</span><span class='line'>  max_size 2
+</span><span class='line'>  step take default
+</span><span class='line'>  step chooseleaf firstn 0 type host-sata
+</span><span class='line'>  step emit
+</span><span class='line'>}
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'># end crush map</span></code></pre></td></tr></table></div></figure>
+
+
+<p>To test the placement, we can use those commands :</p>
+
+<pre><code>crushtool -c crushmap.txt -o crushmap-new.bin
+crushtool --test -i crushmap-new.bin --show-utilization --rule 0 --num-rep=2
+crushtool --test -i crushmap-new.bin --show-choose-tries --rule 0 --num-rep=2
+</code></pre>
+
+<p>Check the utilization :</p>
+
+<pre><code>$ crushtool --test -i crushmap-new.bin --show-utilization  --num-rep=2 | grep ^rule
+rule 0 (sata-rep_2dc), x = 0..1023, numrep = 2..2
+rule 0 (sata-rep_2dc) num_rep 2 result size == 0:   117/1024
+rule 0 (sata-rep_2dc) num_rep 2 result size == 1:   448/1024
+rule 0 (sata-rep_2dc) num_rep 2 result size == 2:   459/1024
+rule 1 (ssd-rep_2dc), x = 0..1023, numrep = 2..2
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 0:    459/1024
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 1:    448/1024
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 2:    117/1024
+rule 2 (sata-all), x = 0..1023, numrep = 2..2
+rule 2 (sata-all) num_rep 2 result size == 0:   113/1024
+rule 2 (sata-all) num_rep 2 result size == 1:   519/1024
+rule 2 (sata-all) num_rep 2 result size == 2:   392/1024
+</code></pre>
+
+<p>For all the rules, the number of replication is insufficient for a part of the sample. Particularly for drives in a minor amount (in that case ssd).
+Looking at the number of retry to chooose an osd, we see that it will be useless to increase the &ldquo;choose_total_tries&rdquo; which is sufficient :</p>
+
+<pre><code>$ crushtool --test -i crushmap-new.bin --show-choose-tries --rule 0 --num-rep=2
+ 0:      4298
+ 1:       226
+ 2:       130
+ 3:        59
+ 4:        38
+ 5:        11
+ 6:        10
+ 7:         3
+ 8:         0
+ 9:         2
+10:         1
+11:         0
+12:         2
+
+$ crushtool --test -i crushmap-new.bin --show-choose-tries --rule 1 --num-rep=2
+ 0:      2930
+ 1:       226
+ 2:       130
+ 3:        59
+ 4:        38
+ 5:        11
+ 6:        10
+ 7:         3
+ 8:         0
+ 9:         2
+10:         1
+11:         0
+12:         2
+
+$ crushtool --test -i crushmap-new.bin --show-choose-tries --rule 2 --num-rep=2
+ 0:      2542
+ 1:        52
+ 2:        12
+</code></pre>
+
+<p>We can test to increase the number of osd for testing (It&rsquo;s not very pretty&hellip;) :</p>
+
+<p>in sata-rep_2dc : <code>step chooseleaf firstn 5 type host-sata</code></p>
+
+<p>in ssd-rep_2dc : <code>step chooseleaf firstn 5 type host-ssd</code></p>
+
+<p>in sata-all : <code>step chooseleaf firstn 15 type host-sata</code></p>
+
+<pre><code>$ crushtool --test -i crushmap-new.bin --show-utilization  --num-rep=2 | grep ^rule
+rule 0 (sata-rep_2dc), x = 0..1023, numrep = 2..2
+rule 0 (sata-rep_2dc) num_rep 2 result size == 1:   1/1024
+rule 0 (sata-rep_2dc) num_rep 2 result size == 2:   1023/1024
+rule 1 (ssd-rep_2dc), x = 0..1023, numrep = 2..2
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 0:    20/1024
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 1:    247/1024
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 2:    757/1024
+rule 2 (sata-all), x = 0..1023, numrep = 2..2
+rule 2 (sata-all) num_rep 2 result size == 2:   1024/1024
+</code></pre>
+
+<p>It&rsquo;s better, we see that for the rule &ldquo;sata-all&rdquo; it works pretty well, by cons, when there are fewer disk, the number of replications is always not correct.
+The idea of this distribution was attractive, but quickly realizes that this can not work.</p>
+
+<p>If people have explored this way, or have examples of advanced CRUSHMAP, I encourage you to share them. I&rsquo;m curious of all that can be done with this. Meanwhile, the best is yet to make it simple to suit your needs. In most cases, the 1.3 model will be perfect.</p>
+
+<p>More details on CRUSH algorithm :
+<a href="http://ceph.com/papers/weil-crush-sc06.pdf">http://ceph.com/papers/weil-crush-sc06.pdf</a></p>
+]]></content>
+  </entry>
+  
+</feed>

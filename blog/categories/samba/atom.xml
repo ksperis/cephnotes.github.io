@@ -1,0 +1,553 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Samba | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/samba/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Low Cost Scale-Out Nas for the Office]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2014/08/07/low-cost-scale-out-nas-for-the-office/"/>
+    <updated>2014-08-07T22:30:00+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2014/08/07/low-cost-scale-out-nas-for-the-office</id>
+    <content type="html"><![CDATA[<p>The aim is showing that it is possible to create a low-cost storage, efficient and scalable, using opensource solutions.
+In the example below, I am using <a href="http://ceph.com/">Ceph</a> for scalability and reliability, combined with <a href="https://github.com/stec-inc/EnhanceIO/">EnhanceIO</a> to ensure very good performance.</p>
+
+<!-- more -->
+
+
+<h2>Architecture</h2>
+
+<p>The idea was to create a storage with two parts: the storage itself (backing store) and a large cache to keep good performance on all data actually used.
+In fact, the volume needs may be important, but in the context of use for office, the data really used every day is only a portion of this storage.
+In my case, I intend to use Ceph deployed on low-cost hardware to ensure a scalable and reliable conformatble volume, based on small servers with large SATA drives. Data access will be via <a href="http://www.samba.org/">Samba</a> shares on a slightly more powerful machine with an SAS Array to create a big cache. (Since Firefly, it would be more interesting to use ceph cache tiering)</p>
+
+<p><img src="/images/img014.png"></p>
+
+<h2>Hardware</h2>
+
+<h4>Ceph Part (Backing Store)</h4>
+
+<p>The material you choose should match the requirements of both performance and cost. To keep prices extremely competitive machines chosen here are based on Supermicro hardware without additional disk controller. Initially, the ceph storage is composed of 5 machines: store-01-02 store, store-03-04 store, store-05. Each node is build with simple CPU Core 2, 4 GB Memory, 1 SSD Drive (Intel 520 60GB) for system and Ceph journal and 3 SATA Drive of 3 TO (Seagate CS 3TB) with no specific Drive controller (Using onbord controller).</p>
+
+<h4>Samba / EnhanceIO Part (File Server and Cache)</h4>
+
+<p>The cache must be on the same server as the file server. In my case, I use Dell server with 10 sas drive 10k in Raid10 for the cache.</p>
+
+<h4>Network</h4>
+
+<p>I do not provide for a specific network, just a gigabit switch with vlan to separate public / private network for Ceph OSD and interface bonding for file server.</p>
+
+<p>The system is currently used everyday since more than one year. And it works perfectly.</p>
+
+<h1>Installation</h1>
+
+<p>Here is some detail of the installation (from what I remember or I noted):</p>
+
+<h2>Ceph Cluster</h2>
+
+<p>The current configuration is running on Ceph Cuttlefish (v0.61) and Debian Wheezy. (Installation made in June 2013.)</p>
+
+<h4>Debian install and partitionning</h4>
+
+<p>The operating system is installed on the SSD with 3 others partitions for osd journal.</p>
+
+<p><img src="/images/img001.png"></p>
+
+<pre><code>$ apt-get install vim sudo sysstat ntp smartmontools
+$ vim /etc/default/smartmontools
+$ vim /etc/smartd.conf
+</code></pre>
+
+<h4>Kernel upgrade</h4>
+
+<p>The use of the kernel version 3.12 available in backports seems improve memory footprint on the osd node.</p>
+
+<pre><code>$ echo "deb http://ftp.fr.debian.org/debian wheezy-backports main" &gt;&gt; /etc/apt/sources.list
+$ apt-get install -t wheezy-backports linux-image-3.12-0.bpo.1-amd64
+</code></pre>
+
+<h4>Ceph Installation</h4>
+
+<p>( Based on the official documentation: <a href="http://ceph.com/docs/master/start/">http://ceph.com/docs/master/start/</a> )</p>
+
+<p>On each server create a ceph user</p>
+
+<pre><code>$ useradd -d /home/ceph -m ceph
+$ passwd ceph
+
+$ vim [[/etc/hosts]]
+192.168.0.1       store-b1-01
+192.168.0.2       store-b1-02
+192.168.0.3       store-b1-03
+192.168.0.4       store-b1-04
+192.168.0.5       store-b1-05
+
+$ echo "ceph ALL = (root) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/ceph
+$ chmod 0440 /etc/sudoers.d/ceph
+</code></pre>
+
+<p>On store-b1-01 (deployment server)</p>
+
+<p>Create a new key for ssh authentication :</p>
+
+<pre><code>$ ssh-keygen
+
+$ cluster="store-b1-01 store-b1-02 store-b1-03 store-b1-04 store-b1-05"
+$ for i in $cluster; do
+      ssh-copy-id ceph@$i
+  done
+
+$ vim /root/.ssh/config
+Host store*
+        User ceph
+</code></pre>
+
+<p>Install ceph-deploy and its dependencies</p>
+
+<pre><code>$ wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
+$ echo deb http://eu.ceph.com/debian-cuttlefish/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
+$ apt-get update
+$ apt-get install python-pkg-resources python-setuptools ceph-deploy collectd
+$ curl http://python-distribute.org/distribute_setup.py | python
+$ easy_install pushy
+</code></pre>
+
+<p>Install ceph on cluster</p>
+
+<pre><code>$ ceph-deploy install $cluster
+$ ceph-deploy new store-b1-01 store-b1-02 store-b1-03
+$ vim ceph.conf
+$ ceph-deploy mon create store-b1-01 store-b1-02 store-b1-03
+</code></pre>
+
+<p>Cluster deployment</p>
+
+<pre><code>$ ceph-deploy gatherkeys store-b1-01
+$ ceph-deploy osd create \
+            store-b1-01:/dev/sdb:/dev/sda5 \
+            store-b1-01:/dev/sdc:/dev/sda6 \
+            store-b1-01:/dev/sdd:/dev/sda7 \
+            store-b1-02:/dev/sdb:/dev/sda5 \
+            store-b1-02:/dev/sdc:/dev/sda6 \
+            store-b1-02:/dev/sdd:/dev/sda7 \
+            store-b1-03:/dev/sdb:/dev/sda5 \
+            store-b1-03:/dev/sdc:/dev/sda6 \
+            store-b1-03:/dev/sdd:/dev/sda7 \
+            store-b1-04:/dev/sdb:/dev/sda5 \
+            store-b1-04:/dev/sdc:/dev/sda6 \
+            store-b1-04:/dev/sdd:/dev/sda7 \
+            store-b1-05:/dev/sdb:/dev/sda5 \
+            store-b1-05:/dev/sdc:/dev/sda6 \
+            store-b1-05:/dev/sdd:/dev/sda7
+</code></pre>
+
+<p>Add in fstab:</p>
+
+<pre><code>/dev/sdb1       /var/lib/ceph/osd/ceph-0        xfs     inode64,noatime         0       0
+/dev/sdc1       /var/lib/ceph/osd/ceph-1        xfs     inode64,noatime         0       0
+/dev/sdd1       /var/lib/ceph/osd/ceph-2        xfs     inode64,noatime         0       0
+</code></pre>
+
+<p>One can check that all osd have been created, and check the cluster status :</p>
+
+<pre><code>$ ceph osd tree
+
+# id    weight  type name   up/down reweight
+-1  41.23   root default
+-8  41.23       datacenter DC1
+-7  41.23           rack b1
+-2  8.24                host store-b1-01
+0   2.65                    osd.0   up  1   
+1   2.65                    osd.1   up  1   
+2   2.65                    osd.2   up  1   
+-3  8.24                host store-b1-02
+3   2.65                    osd.3   up  1   
+4   2.65                    osd.4   up  1   
+5   2.65                    osd.5   up  1   
+-4  8.24                host store-b1-03
+6   2.65                    osd.6   up  1   
+7   2.65                    osd.7   up  1   
+8   2.65                    osd.8   up  1   
+-5  8.24                host store-b1-04
+9   2.65                    osd.9   up  1   
+10  2.65                    osd.10  up  1   
+11  2.65                    osd.11  up  1   
+-6  8.24                host store-b1-05
+12  2.65                    osd.12  up  1   
+13  2.65                    osd.13  up  1   
+14  2.65                    osd.14  up  1   
+</code></pre>
+
+<h2>File Server</h2>
+
+<h4>Debian interface bonding</h4>
+
+<pre><code>$ apt-get install ifenslave
+
+$ vim /etc/network/interface
+auto bond0
+iface bond0 inet static
+        address 192.168.0.12
+        netmask 255.255.0.0
+        gateway 192.168.0.1
+        slaves eth0 eth1
+        bond-mode 802.3ad
+
+$ echo "alias bond0 bonding
+options bonding mode=4 miimon=100 lacp_rate=1" &gt; vim /etc/modprobe.d/bonding.conf
+
+$ echo "bonding" &gt;&gt; /etc/modules
+</code></pre>
+
+<h4>Kernel Version</h4>
+
+<p>The kernel version is important for using KRBD. I recommend to use at least kernel 3.10.26 or later.</p>
+
+<pre><code>$ apt-get install debconf-utils dpkg-dev debhelper build-essential kernel-package libncurses5-dev
+$ cd /usr/src/
+$ wget http://www.kernel.org/pub/linux/kernel/v3.0/linux-3.6.11.tar.bz2
+$ tar xjf linux-3.6.11.tar.bz2
+</code></pre>
+
+<h4>RBD</h4>
+
+<p>Create rbd volume (Format 1) :</p>
+
+<pre><code>$ rbd create datashare/share1 --image-format=1 --size=1048576
+
+$ mkdir /share1
+$ echo "/dev/rbd/datashare/share1   /share1 xfs _netdev,barrier=0,nodiratime        0   0" &gt;&gt; /etc/fstab
+</code></pre>
+
+<h4>EnhanceIO</h4>
+
+<p>The choice of cache mechanism is focused on &ldquo;EnhanceIO&rdquo; because it allows to enable or disable cache while a source volume is being used. This is particularly useful when we want to resize a volume without interrupting service.</p>
+
+<p>Build EnhanceIO :</p>
+
+<pre><code>$ apt-get install build-essential dkms
+$ git clone https://github.com/stec-inc/EnhanceIO.git
+$ cd EnhanceIO/
+$ wget http://ftp.de.debian.org/debian/pool/main/e/enhanceio/enhanceio_0+git20130620-3.debian.tar.xz
+$ tar xJf enhanceio_0+git20130620-3.debian.tar.xz
+$ dpkg-buildpackage -rfakeroot -b
+$ dpkg -i ../*.deb
+</code></pre>
+
+<p>Create cache :</p>
+
+<p>For exemple in write-though :
+(/dev/sdb2 is a local partition dedicate for cache)</p>
+
+<pre><code>$ eio_cli create -d /dev/rbd1 -s /dev/sdb2 -p lru -m wt -b 4096 -c share1
+</code></pre>
+
+<p>If you want to use write-back cache, you can protect the file system to mount before the cache by using a symbolic link in the udev script. ( <a href="https://github.com/ksperis/EnhanceIO/commit/954e167fdb580d514747512ce2bd1c9c29a77418">https://github.com/ksperis/EnhanceIO/commit/954e167fdb580d514747512ce2bd1c9c29a77418</a> )</p>
+
+<h4>Samba</h4>
+
+<p>Packages installation</p>
+
+<pre><code>$ echo "deb http://ftp.sernet.de/pub/samba/3.6/debian wheezy main" &gt;&gt; /etc/apt/sources.list
+$ apt-get update
+$ apt-get install sernet-samba sernet-winbind xfsprogs krb5-user acl attr
+</code></pre>
+
+<p>Update startup script</p>
+
+<pre><code>$ vim /etc/init.d/samba
+# Should-Start:      slapd cups rbdmap
+# Should-Stop:       slapd cups rbdmap
+
+$ insserv -d samba
+</code></pre>
+
+<p>Configure and join the domain ( <a href="https://help.ubuntu.com/community/ActiveDirectoryWinbindHowto">https://help.ubuntu.com/community/ActiveDirectoryWinbindHowto</a> )</p>
+
+<pre><code>$ vi /etc/krb5.conf
+...
+$ kinit Administrator@AD.MYDOMAIN.COM
+
+$ vim /etc/samba/smb.conf
+[global]
+    workgroup = MYDOMAIN
+    realm = AD.MYDOMAIN.COM
+    netbios name = MYNAS
+    wins server = 192.168.0.4
+    server string = %h server
+    dns proxy = no
+    log file = /var/log/samba/log.%m
+    log level = 1
+    max log size = 1000
+    syslog = 0
+    panic action = /usr/share/samba/panic-action %d
+    security = ADS
+    winbind separator = +
+    client use spnego = yes
+    winbind use default domain = yes
+    domain master = no
+    local master = no
+    preferred master = no
+    encrypt passwords = true
+    passdb backend = tdbsam
+    obey pam restrictions = yes
+    unix password sync = yes
+    passwd program = /usr/bin/passwd %u
+    passwd chat = *Enter\snew\s*\spassword:* %n\n *Retype\snew\s*\spassword:* %n\n *password\supdated\ssuccessfully* .
+    pam password change = yes
+    idmap uid = 10000-20000
+    idmap gid = 10000-20000
+    template shell = /bin/bash
+    template homedir = /share4/home/%D/%U
+    winbind enum groups = yes
+    winbind enum users = yes
+    map acl inherit = yes
+    vfs objects = acl_xattr recycle shadow_copy2
+    recycle:repository =.recycle/%u 
+    recycle:keeptree = yes
+    recycle:exclude = *.tmp
+    recycle:touch = yes
+    shadow:snapdir = .snapshots
+    shadow:sort = desc
+    ea support = yes
+    map hidden = no
+    map system = no
+    map archive = no
+    map readonly = no
+    store dos attributes = yes
+    load printers = no
+    printing=bsd
+    printcap name = /dev/null
+    disable spoolss = yes
+    guest account = invité
+    map to guest = bad user
+
+$================================================================
+
+[share0]
+    comment = My first share
+    path = /share0
+    writable = yes
+    valid users = @"MYDOMAIN+Domain Admins" "MYDOMAIN+laurent"
+
+[share1]
+    comment = Other share
+    path = /share1
+    writable = yes
+    valid users = @"MYDOMAIN+Domain Admins" "MYDOMAIN+laurent"
+
+....
+
+
+$ /etc/init.d/samba restart
+$ net join -U Administrator
+$ wbinfo -u
+$ wbinfo -g
+
+$ vi /etc/nsswitch.conf
+passwd:         compat winbind
+group:          compat winbind
+</code></pre>
+
+<h4>Virtual Shadow Copy</h4>
+
+<p>Using this script :
+<a href="https://github.com/ksperis/autosnap-rbd-shadow-copy">https://github.com/ksperis/autosnap-rbd-shadow-copy</a></p>
+
+<h4>TimeMachine Backup</h4>
+
+<p>Fisrt, create rbd timemachine and mount to /mnt/timemachine with noatime and uquota if you want to use per user quota (Do not add to the autosnap script.)</p>
+
+<p>Install avahi</p>
+
+<pre><code>$ apt-get install avahi-daemon avahi-utils
+
+$ vim /etc/avahi/services/smb.service
+&lt;?xml version="1.0" standalone='no'?&gt;
+&lt;!DOCTYPE service-group SYSTEM "avahi-service.dtd"&gt;
+&lt;service-group&gt;
+  &lt;name replace-wildcards="yes"&gt;%h (File Server)&lt;/name&gt;
+  &lt;service&gt;
+    &lt;type&gt;_smb._tcp&lt;/type&gt;
+    &lt;port&gt;445&lt;/port&gt;
+  &lt;/service&gt;
+  &lt;service&gt;
+    &lt;type&gt;_device-info._tcp&lt;/type&gt;
+    &lt;port&gt;0&lt;/port&gt;
+    &lt;txt-record&gt;model=RackMac&lt;/txt-record&gt;
+  &lt;/service&gt;
+&lt;/service-group&gt;
+
+$ vim /etc/avahi/services/timemachine.service
+&lt;?xml version="1.0" standalone="no"?&gt;
+&lt;!DOCTYPE service-group SYSTEM "avahi-service.dtd"&gt;
+&lt;service-group&gt;
+  &lt;name replace-wildcards="yes"&gt;%h (Time Machine)&lt;/name&gt;
+  &lt;service&gt;
+    &lt;type&gt;_afpovertcp._tcp&lt;/type&gt;
+    &lt;port&gt;548&lt;/port&gt;
+  &lt;/service&gt;
+  &lt;service&gt;
+    &lt;type&gt;_device-info._tcp&lt;/type&gt;
+    &lt;port&gt;0&lt;/port&gt;
+    &lt;txt-record&gt;model=TimeCapsule&lt;/txt-record&gt;
+  &lt;/service&gt;
+  &lt;service&gt;
+    &lt;type&gt;_adisk._tcp&lt;/type&gt;
+    &lt;port&gt;9&lt;/port&gt;
+    &lt;txt-record&gt;sys=waMA=00:1d:09:63:87:e0,adVF=0x100&lt;/txt-record&gt;
+    &lt;txt-record&gt;dk0=adVF=0x83,adVN=TimeMachine&lt;/txt-record&gt;
+  &lt;/service&gt;
+&lt;/service-group&gt;
+</code></pre>
+
+<p>Install netatalk and configure like this :</p>
+
+<pre><code>$ apt-get install netatalk
+$ vim /etc/netatalk/afpd.conf
+- -tcp -noddp -nozeroconf -uamlist uams_dhx.so,uams_dhx2.so -nosavepassword -setuplog "default log_info /var/log/afpd.log"
+
+
+$ vim /etc/netatalk/AppleVolumes.default   (Remove home directory + Add :)
+/mnt/timemachine/ "TimeMachine" cnidscheme:dbd options:usedots,upriv,tm allow:@"MYDOMAIN+Domain Users"
+
+$ vim /etc/pam.d/netatalk
+auth       required     pam_winbind.so
+account    required     pam_winbind.so
+session    required     pam_unix.so
+</code></pre>
+
+<p>Setting quota for a user : (Do not use soft limits, because it will not be recognized by timemachine.)</p>
+
+<pre><code>$ xfs_quota -x -c 'limit bhard=1024g user1' /mnt/timemachine
+</code></pre>
+
+<h2>Benchmark</h2>
+
+<p><img src="/images/img013.png"></p>
+
+<p>( For sequential IO, bandwidth is limited by the network card on the client side. )</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Samba shadow_copy and Ceph RBD]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2013/08/09/samba-shadow-copy-and-ceph-rbd/"/>
+    <updated>2013-08-09T22:42:00+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2013/08/09/samba-shadow-copy-and-ceph-rbd</id>
+    <content type="html"><![CDATA[<p>I add script to create snapshot on rbd for use with samba shadow_copy2.
+For more details go on <a href="https://github.com/ksperis/autosnap-rbd-shadow-copy">https://github.com/ksperis/autosnap-rbd-shadow-copy</a></p>
+
+<!-- more -->
+
+
+<h2> How to use :</h2>
+
+<p>Before you need to have ceph cluster running and samba installed.</p>
+
+<p>Verify admin access to the ceph cluster : (should not return error)
+<code>
+$ rbd ls
+</code></p>
+
+<p>Get the script :
+<code>
+$ mkdir -p /etc/ceph/scripts/
+$ cd /etc/ceph/scripts/
+$ wget https://raw.github.com/ksperis/autosnap-rbd-shadow-copy/master/autosnap.conf
+$ wget https://raw.github.com/ksperis/autosnap-rbd-shadow-copy/master/autosnap.sh
+$ chmod +x autosnap.sh
+</code></p>
+
+<p>Create a block device :
+<code>
+$ rbd create myshare --size=1024
+$ echo "myshare" &gt;&gt; /etc/ceph/rbdmap
+$ /etc/init.d/rbdmap reload
+[ ok ] Starting RBD Mapping: rbd/myshare.
+[ ok ] Mounting all filesystems...done.
+</code></p>
+
+<p>Format the block device :
+```
+$ mkfs.xfs /dev/rbd/rbd/myshare
+log stripe unit (4194304 bytes) is too large (maximum is 256KiB)
+log stripe unit adjusted to 32KiB
+meta-data=/dev/rbd/rbd/myshare   isize=256    agcount=9, agsize=31744 blks</p>
+
+<pre><code>     =                       sectsz=512   attr=2, projid32bit=0
+</code></pre>
+
+<p>data     =                       bsize=4096   blocks=262144, imaxpct=25</p>
+
+<pre><code>     =                       sunit=1024   swidth=1024 blks
+</code></pre>
+
+<p>naming   =version 2              bsize=4096   ascii-ci=0
+log      =internal log           bsize=4096   blocks=2560, version=2</p>
+
+<pre><code>     =                       sectsz=512   sunit=8 blks, lazy-count=1
+</code></pre>
+
+<p>realtime =none                   extsz=4096   blocks=0, rtextents=0
+```</p>
+
+<p>Mount the share :
+<code>
+$ mkdir /myshare
+$ echo "/dev/rbd/rbd/myshare /myshare xfs defaults 0 0" &gt;&gt; /etc/fstab
+$ mount /myshare
+</code></p>
+
+<p>Add this section in your /etc/samba/smb.conf :
+```
+[myshare]</p>
+
+<pre><code>path = /myshare
+writable = yes
+vfs objects = shadow_copy2
+shadow:snapdir = .snapshots
+shadow:sort = desc
+</code></pre>
+
+<p>```</p>
+
+<p>Reload samba
+<code>
+$ /etc/init.d/samba reload
+</code></p>
+
+<p>Create snapshot directory and run the script :
+<code>
+$ mkdir -p /myshare/.snapshots
+$ /etc/ceph/scripts/autosnap.sh
+* Create snapshot for myshare: @GMT-2013.08.09-10.16.10-autosnap
+synced, no cache, snapshot created.
+* Shadow Copy to mount for rbd/myshare :
+GMT-2013.08.09-10.14.44
+</code></p>
+
+<p>Verify that the first snapshot is correctly mount :
+<code>
+$ mount | grep myshare
+/dev/rbd1 on /myshare type xfs (rw,relatime,attr2,inode64,sunit=8192,swidth=8192,noquota)
+/dev/rbd2 on /myshare/.snapshots/@GMT-2013.08.09-10.14.44 type xfs (ro,relatime,nouuid,norecovery,attr2,inode64,sunit=8192,swidth=8192,noquota)
+</code></p>
+
+<p>Also, you can add this on crontab to run everyday the script :
+<code>
+$ echo "00 0    * * *   root    /bin/bash /etc/ceph/scripts/autosnap.sh" &gt;&gt; /etc/crontab
+</code></p>
+]]></content>
+  </entry>
+  
+</feed>

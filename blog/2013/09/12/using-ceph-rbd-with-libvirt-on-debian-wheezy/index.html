@@ -1,0 +1,474 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Using Ceph Rbd With Libvirt on Debian Wheezy - CephNotes</title>
+  <meta name="author" content="Laurent Barbe">
+
+  
+  <meta name="description" content="Howto add support of rbd device on debian wheezy. libvirt Since wheezy, libvirt supports rbd device. qemu-kvm If you do not add the support in qemu- &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="CephNotes" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="/stylesheets/tables.css" media="screen, projection" rel="stylesheet" type="text/css" />
+
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-42826829-2']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">CephNotes</a></h1>
+  
+    <h2><h2>Some notes about Ceph<br>Laurent Barbe @CCM Benchmark</h2></h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="as_sitesearch" value="cephnotes.ksperis.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Using Ceph Rbd With Libvirt on Debian Wheezy</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2013-09-12T16:44:00+02:00" pubdate data-updated="true" class="updated">Sep 12<span>th</span>, 2013</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Howto add support of rbd device on debian wheezy.</p>
+
+<!-- more -->
+
+
+<h1>libvirt</h1>
+
+<p>Since wheezy, libvirt supports rbd device.</p>
+
+<h1>qemu-kvm</h1>
+
+<p>If you do not add the support in qemu-kvm you may have an error like this:</p>
+
+<pre><code>error: Failed to start domain ubuntu
+error: internal error process exited while connecting to monitor: char device redirected to /dev/pts/2
+kvm: -drive file=rbd:vmimages/ubuntu:id=vmimages:key=AQAfwTFScNKmLxAAo9abfSLct78rfIQRzQnS5A==:auth_supported=cephx\;none:mon_host=192.168.0.100\:6789\;192.168.0.101\:6789\;192.168.0.102\:6789,if=none,id=drive-virtio-disk0,format=raw,cache=writeback: could not open disk image rbd:vmimages/ubuntu:id=vmimages:key=AQAfwTFScNKmLxAAo9abfSLct78rfIQRzQnS5A==:auth_supported=cephx\;none:mon_host=192.168.0.100\:6789\;192.168.0.101\:6789\;192.168.0.102\:6789: No such file or directory
+</code></pre>
+
+<h2>install ceph dependencies</h2>
+
+<pre><code>apt-get install lsb-release
+wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
+echo deb http://ceph.com/debian-firefly/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
+apt-get update
+apt-get install librbd-dev librados-dev build-essential
+</code></pre>
+
+<h2>build kvm</h2>
+
+<pre><code>mkdir -p sources/qemu-kvm
+cd sources/qemu-kvm
+apt-get source qemu-kvm
+apt-get build-dep qemu-kvm
+cd qemu-kvm-1.1.2+dfsg/
+vim debian/optional-features
+</code></pre>
+
+<p>Uncomment line <code># --enable-rbd</code>
+and compile :</p>
+
+<pre><code>dpkg-buildpackage -rfakeroot -b
+cd ..
+</code></pre>
+
+<p>Installation :</p>
+
+<pre><code>apt-get install librados2 librbd1
+dpkg -i kvm_1.1.2+dfsg-6_amd64.deb qemu-kvm_1.1.2+dfsg-6_amd64.deb
+</code></pre>
+
+<p>Becareful on upgrade !
+You can also hold package version :</p>
+
+<pre><code>echo "kvm hold" | dpkg --set-selections
+echo "qemu-kvm hold" | dpkg --set-selections
+</code></pre>
+
+<h1>qemu (for util like qemu-img)</h1>
+
+<p>(Only if needed)
+You also need to add support in debian rules : &ldquo;&mdash;enable-rbd&rdquo;</p>
+
+<pre><code>mkdir -p sources/qemu
+cd sources/qemu
+apt-get source qemu
+apt-get build-dep qemu
+cd qemu-1.1.2+dfsg/
+vim debian/rules +82
+dpkg-buildpackage -rfakeroot -b
+cd ..
+</code></pre>
+
+<h1>Use</h1>
+
+<p>Create a pool and associated key on ceph admin host :</p>
+
+<pre><code>ceph osd pool create vmimages 100 100
+ceph auth get-or-create client.vmimages mon 'allow r' osd 'allow rwx pool=vmimages'
+</code></pre>
+
+<p>keep the key returned.</p>
+
+<p>Create a secret file for libvirt for this user :</p>
+
+<pre><code>echo "
+    &lt;secret ephemeral='no' private='no'&gt;
+   &lt;usage type='ceph'&gt;
+     &lt;name&gt;client.vmimages secret&lt;/name&gt;
+   &lt;/usage&gt;
+&lt;/secret&gt;" &gt; secret.xml
+
+virsh secret-define --file secret.xml
+</code></pre>
+
+<p>Define the key value :
+first uuid is the value return by the previous command
+follow by the key return by <code>ceph auth get-or-create</code></p>
+
+<pre><code>virsh secret-set-value  76e3a541-b997-58ac-f7bd-77dd7d4347cb AQAREH1QkNDNCBaac03ZICi/CePnRDS+vGyrqQ==
+</code></pre>
+
+<p>Create a device:</p>
+
+<p>(on ceph admin host if you do not want to specify the user, the key, and monitors)
+with rbd : <code>rbd create vmimages/ubuntu-newdrive --size=2048</code>
+with qemu (you need to add support for that) : <code>qemu-img create -f rbd rbd:vmimages/ubuntu-newdrive 2G</code></p>
+
+<p>Attach on existing host (even if running) :</p>
+
+<p>(192.168.0.100, 192.168.0.101, 192.168.0.102 is the mon host.)</p>
+
+<pre><code>echo "
+    &lt;disk type='network' device='disk'&gt;
+      &lt;driver name='qemu' type='raw'/&gt;
+      &lt;auth username='vmimages'&gt;
+        &lt;secret type='ceph' uuid='76e3a541-b997-58ac-f7bd-77dd7d4347cb'/&gt;
+      &lt;/auth&gt;
+      &lt;source protocol='rbd' name='vmimages/ubuntu-newdrive'&gt;
+        &lt;host name='192.168.0.100' port='6789'/&gt;
+        &lt;host name='192.168.0.101' port='6789'/&gt;
+        &lt;host name='192.168.0.102' port='6789'/&gt;
+      &lt;/source&gt;
+      &lt;target dev='vdz' bus='virtio'/&gt;
+    &lt;/disk&gt;
+" &gt; device.xml
+
+virsh attach-device ubuntu device.xml --persistent 
+</code></pre>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Laurent Barbe</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2013-09-12T16:44:00+02:00" pubdate data-updated="true" class="updated">Sep 12<span>th</span>, 2013</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/librbd/'>librbd</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="//twitter.com/share" class="twitter-share-button" data-url="http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy/" data-via="ksperis" data-counturl="http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy/" >Tweet</a>
+  
+  
+  <div class="g-plusone" data-size="medium"></div>
+  
+  
+    <div class="fb-like" data-send="true" data-width="450" data-show-faces="false"></div>
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2013/09/10/object-difference-between-rbd-format1-and-format2/" title="Previous Post: Object difference between RBD format1 and format2">&laquo; Object difference between RBD format1 and format2</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2013/12/09/ceph-osd-reweight/" title="Next Post: Ceph osd reweight">Ceph osd reweight &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2017/07/28/how-many-mouvement-when-i-add-a-replica/">How Many Mouvement When I Add a Replica ?</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/03/03/dealing-with-some-osd-timeouts/">Dealing With Some Osd Timeouts</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/27/erasure-code-on-small-clusters/">Erasure Code on Small Clusters</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/23/crushmap-for-2-dc/">Crushmap for 2 DC</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/20/change-log-level-on-the-fly-to-ceph-daemons/">Change Log Level on the Fly to Ceph Daemons</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2017/01/06/main-new-features-in-the-latest-versions-of-ceph/">Main New Features in the Latest Versions of Ceph</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/05/26/check-osd-version/">Check OSD Version</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/05/24/find-the-osd-location/">Find the OSD Location</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd/">LXC 2.0.0 First Support for Ceph RBD</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/08/13/downgrade-lsi-9207-to-p19-firmware/">Downgrade LSI 9207 to P19 Firmware</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/25/get-omap-key-slash-value-size/">Get OMAP Key/value Size</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/22/the-kernel-4-dot-1-is-out/">The Kernel 4.1 Is Out</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/06/18/add-support-of-curl-multi-wait-for-radosgw-on-debian-wheezy/">Add Support of Curl_multi_wait for RadosGW on Debian Wheezy</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/19/intel-520-ssd-journal/">Intel 520 SSD Journal</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2015/05/12/radosgw-big-index/">RadosGW Big Index</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/ksperis">@ksperis</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'ksperis',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2017 - Laurent Barbe -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'cephnotes';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy/';
+        var disqus_url = 'http://cephnotes.ksperis.com/blog/2013/09/12/using-ceph-rbd-with-libvirt-on-debian-wheezy/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id; js.async = true;
+  js.src = "//connect.facebook.net/en_US/all.js#appId=212934732101925&xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+
+
+
+  <script type="text/javascript">
+    (function() {
+      var script = document.createElement('script'); script.type = 'text/javascript'; script.async = true;
+      script.src = 'https://apis.google.com/js/plusone.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(script, s);
+    })();
+  </script>
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = '//platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

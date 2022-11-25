@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: LXC | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/lxc/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[LXC 2.0.0 First support for Ceph RBD]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd/"/>
+    <updated>2016-04-14T14:10:12+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd</id>
+    <content type="html"><![CDATA[<p>FYI, the first RBD support has been added to LXC commands.</p>
+
+<h2>Example :</h2>
+
+<p>```bash</p>
+
+<h1>Install LXC 2.0.0 (ubuntu) :</h1>
+
+<p>$ add-apt-repository ppa:ubuntu-lxc/lxc-stable
+$ apt-get update
+$ apt-get install lxc</p>
+
+<h1>Add a ceph pool for lxc bloc devices :</h1>
+
+<p>$ ceph osd pool create lxc 64 64</p>
+
+<h1>To create the container, you only need to specify &ldquo;rbd&rdquo; backingstore :</h1>
+
+<p>$ lxc-create -n ctn1 -B rbd -t debian
+/dev/rbd0
+debootstrap est /usr/sbin/debootstrap
+Checking cache download in /var/cache/lxc/debian/rootfs-jessie-amd64 &hellip;
+Copying rootfs to /usr/lib/x86_64-linux-gnu/lxc&hellip;
+Generation complete.
+```</p>
+
+<p>```
+$ rbd showmapped
+id pool image snap device  <br/>
+0  lxc  ctn1  &ndash;    /dev/rbd0</p>
+
+<p>$ rbd -p lxc info ctn1
+rbd image &lsquo;ctn1&rsquo;:</p>
+
+<pre><code>size 1024 MB in 256 objects
+order 22 (4096 kB objects)
+block_name_prefix: rb.0.1217d.74b0dc51
+format: 1
+</code></pre>
+
+<p>```</p>
+
+<p><code>
+$ lxc-start -n ctn1
+$ lxc-attach -n ctn1
+ctn1$ mount | grep ' / '
+/dev/rbd/lxc/ctn1 on / type ext3 (rw,relatime,stripe=1024,data=ordered)
+</code></p>
+
+<p><code>bash
+$ lxc-destroy -n ctn1
+Removing image: 100% complete...done.
+Destroyed container ctn1
+</code></p>
+
+<!-- more -->
+
+
+<h2>Some options :</h2>
+
+<p>```
+&mdash;rbdpool POOL   : will create the blockdevice in the pool named POOL, rather than the default, which is &lsquo;lxc&rsquo;.</p>
+
+<p>&mdash;rbdname RBDNAME : will create a blockdevice named RBDNAME rather than the default, which is the container name.</p>
+
+<p>&mdash;fssize : Create a RBD of size SIZE * unit U (bBkKmMgGtT)
+```</p>
+
+<p>For example :
+<code>bash
+$ lxc-create -n ctn2 -B rbd -t debian --rbdpool=rbd --rbdname=lxc-ctn2 --fssize=2G
+</code></p>
+
+<h2>What is not yet done:</h2>
+
+<ul>
+<li>Persistence on reboot: (RBD can be optionally added to rbdmap file)</li>
+<li>Snapshots</li>
+<li>Params for authentication (user, keyring&hellip;)</li>
+<li>Other rbd options (format, &hellip;)</li>
+</ul>
+
+
+<p>The release annoucement :</p>
+
+<p><a href="https://linuxcontainers.org/fr/lxc/news/#lxc-200-release-announcement-6th-of-april-2016">https://linuxcontainers.org/fr/lxc/news/#lxc-200-release-announcement-6th-of-april-2016</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Multiple clusters on the same hardware: OSD isolation with LXC]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/01/29/multiple-clusters-on-the-same-hardware-osd-isolation-with-lxc/"/>
+    <updated>2015-01-29T08:00:41+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/01/29/multiple-clusters-on-the-same-hardware-osd-isolation-with-lxc</id>
+    <content type="html"><![CDATA[<p>Ceph makes it easy to create multiple cluster on the same hardware with the naming of clusters. If you want a better insolation you can use LXC, for example to allow a different version of Ceph between your clusters.</p>
+
+<p><img src="/images/img019.png"></p>
+
+<p>For this you will need access to the physical disks from the container. You just allow access to the device with cgroup and create the device with mknod :</p>
+
+<pre><code># Retrieve the major and minor number for a device :
+$ ls -l /dev/sda5
+brw-rw---T 1 root disk 8, 5 janv. 26 18:47 /dev/sda5
+
+$ mknod /var/lib/lxc/container-cluster1/rootfs/dev/sda5 b 8 5
+$ echo "lxc.cgroup.devices.allow = b 8:7 rwm" &gt;&gt; /var/lib/lxc/container-cluster1/config
+</code></pre>
+
+<!--more-->
+
+
+<p>However, if you want to use &ldquo;ceph-deploy&rdquo; you may be faced to many problems for the deployment of OSD. Indeed, tools needs to access access to all devices to work correctly. It will therefore also need to create all partition on physical host and add a line like that: <code>lxc.cgroup.devices.allow = b 8:* r</code> in lxc config. Also, udev is not active in the container, so it will need to create all devices or make a bind mount for /dev. <code>mount -o bind /dev /var/lib/lxc/container-cluster1/rootfs/dev/</code>. Then, udev rules will not run&hellip;. The easiest way remains the manual deployment for this part or use for example ceph-ansible which will certainly allows to be more flexible.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Ceph RBD with LXC containers]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2014/11/17/ceph-rbd-with-lxc-containers/"/>
+    <updated>2014-11-17T11:15:19+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2014/11/17/ceph-rbd-with-lxc-containers</id>
+    <content type="html"><![CDATA[<p><blockquote><p>Update on Apr 14th, 2016:</p><footer><strong>LXC 2.0.0 First Support for Ceph RBD : <a href="http://cephnotes.ksperis.com/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd">http://cephnotes.ksperis.com/blog/2016/04/14/lxc-2-dot-0-0-first-support-for-ceph-rbd</a></strong></footer></blockquote></p>
+
+<p>A simple way to secure your data with containers is to use a distributed storage such as Ceph for LXC root storage.</p>
+
+<p>For exemple :</p>
+
+<p>``` bash</p>
+
+<h1>lxc-create -n mycontainer -t debian -B rbd &mdash;pool rbd &mdash;rbd mycontainer &mdash;fstype ext4 &mdash;fssize 500</h1>
+
+<p>```</p>
+
+<!-- more -->
+
+
+<p>```
+mke2fs 1.42.5 (29-Jul-2012)
+Filesystem label=
+OS type: Linux
+Block size=1024 (log=0)
+Fragment size=1024 (log=0)
+Stride=4096 blocks, Stripe width=4096 blocks
+128016 inodes, 512000 blocks
+25600 blocks (5.00%) reserved for the super user
+First data block=1
+Maximum filesystem blocks=67633152
+63 block groups
+8192 blocks per group, 8192 fragments per group
+2032 inodes per group
+Superblock backups stored on blocks:</p>
+
+<pre><code>8193, 24577, 40961, 57345, 73729, 204801, 221185, 401409
+</code></pre>
+
+<p>Allocating group tables: done                          <br/>
+Writing inode tables: done                          <br/>
+Creating journal (8192 blocks): done
+Writing superblocks and filesystem accounting information: done</p>
+
+<p>Note: Usually the template option is called with a configuration
+file option too, mostly to configure the network.
+For more information look at lxc.conf (5)</p>
+
+<p>debootstrap is /usr/sbin/debootstrap
+Checking cache download in /var/cache/lxc/debian/rootfs-wheezy-amd64 &hellip;
+Copying rootfs to /var/lib/lxc/mycontainer/rootfs&hellip;Generating locales (this might take a while)&hellip;
+  en_US.UTF-8&hellip; done
+Generation complete.
+update-rc.d: using dependency based boot sequencing
+update-rc.d: using dependency based boot sequencing
+update-rc.d: using dependency based boot sequencing
+update-rc.d: using dependency based boot sequencing</p>
+
+<p>Current default time zone: &lsquo;America/New_York&rsquo;
+Local time is now:      Tue Nov 18 09:34:16 EST 2014.
+Universal Time is now:  Tue Nov 18 14:34:16 UTC 2014.</p>
+
+<p>Root password is &lsquo;root&rsquo;, please change !
+&lsquo;debian&rsquo; template installed
+&lsquo;mycontainer&rsquo; created
+```</p>
+
+<p>```</p>
+
+<h1>mount | grep mycontainer</h1>
+
+<p>/dev/rbd1 on /var/lib/lxc/mycontainer/rootfs type ext4 (rw,relatime,stripe=4096,data=ordered)
+```</p>
+
+<p>Diff file for lxc-create :</p>
+
+<p>``` bash</p>
+
+<h1>diff -u /usr/bin/lxc-create.orig /usr/bin/lxc-create</h1>
+
+<p>```</p>
+
+<p>``` diff
+&mdash;&ndash; /usr/bin/lxc-create.orig    2014-11-17 04:16:41.181942000 -0500
++++ /usr/bin/lxc-create 2014-11-17 04:35:27.225942000 -0500
+@@ -24,6 +24,7 @@</p>
+
+<pre><code> echo "usage: lxc-create -n &lt;name&gt; [-f configuration] [-t template] [-h] [fsopts] -- [template_options]"
+ echo "   fsopts: -B none"
+ echo "   fsopts: -B lvm [--lvname lvname] [--vgname vgname] [--fstype fstype] [--fssize fssize]"
+</code></pre>
+
+<ul>
+<li> echo &ldquo;   fsopts: -B rbd [&mdash;pool poolname] [&mdash;rbd rbd] [&mdash;fstype fstype] [&mdash;fssize fssize]&rdquo;
+ echo &ldquo;   fsopts: -B btrfs&rdquo;
+ echo &ldquo;           flag is not necessary, if possible btrfs support will be used&rdquo;
+
+<h1>echo &ldquo;   fsopts: -B union [&mdash;uniontype overlayfs]&rdquo;</h1>
+
+<p>@@ -64,7 +65,7 @@
+}</p></li>
+</ul>
+
+
+<p> shortoptions=&lsquo;hn:f:t:B:&rsquo;
+-longoptions=&lsquo;help,name:,config:,template:,backingstore:,fstype:,lvname:,vgname:,fssize:&rsquo;
++longoptions=&lsquo;help,name:,config:,template:,backingstore:,fstype:,lvname:,vgname:,pool:,rbd:,fssize:&rsquo;
+ localstatedir=/var
+ lxc_path=${localstatedir}/lib/lxc
+ bindir=/usr/bin
+@@ -119,6 +120,16 @@</p>
+
+<pre><code>    vgname=$1
+    shift
+    ;;
+</code></pre>
+
+<ul>
+<li><pre><code> --pool)
+</code></pre></li>
+<li><pre><code> shift
+</code></pre></li>
+<li><pre><code> pool=$1
+</code></pre></li>
+<li><pre><code> shift
+</code></pre></li>
+<li><pre><code> ;;
+</code></pre></li>
+<li><pre><code> --rbd)
+</code></pre></li>
+<li><pre><code> shift
+</code></pre></li>
+<li><pre><code> rbd=$1
+</code></pre></li>
+<li><pre><code> shift
+</code></pre></li>
+<li><pre><code> ;;
+--fstype)
+shift
+fstype=$1
+</code></pre>
+
+<p>@@ -161,7 +172,7 @@
+fi</p></li>
+</ul>
+
+
+<p> case &ldquo;$backingstore&rdquo; in
+&ndash;    lvm|none|btrfs|<em>unset) :;;
++    lvm|rbd|none|btrfs|</em>unset) :;;</p>
+
+<pre><code> *) echo "'$backingstore' is not known ('none', 'lvm', 'btrfs')"
+     usage
+     exit 1
+</code></pre>
+
+<p>@@ -216,6 +227,13 @@</p>
+
+<pre><code>     echo "please delete it (using \"lvremove $rootdev\") and try again"
+     exit 1
+ fi
+</code></pre>
+
+<p>+elif [ &ldquo;$backingstore&rdquo; = &ldquo;rbd&rdquo; ]; then
++    which rbd > /dev/null
++    if [ $? -ne 0 ]; then
++        echo &ldquo;rbd command not found. Please install ceph-common package&rdquo;
++        exit 1
++    fi
++    rootdev=/dev/rbd/$pool/$rbd
+ elif [ &ldquo;$backingstore&rdquo; = &ldquo;btrfs&rdquo; ]; then</p>
+
+<pre><code> mkdir "$lxc_path/$lxc_name"
+ if ! out=$(btrfs subvolume create "$rootfs" 2&gt;&amp;1); then
+</code></pre>
+
+<p>@@ -257,6 +275,14 @@</p>
+
+<pre><code> mkfs -t $fstype $rootdev || exit 1
+ mount -t $fstype $rootdev $rootfs
+</code></pre>
+
+<p> fi
++
++if [ $backingstore = &ldquo;rbd&rdquo; ]; then
++    [ -d &ldquo;$rootfs&rdquo; ] || mkdir $rootfs
++    rbd create $pool/$rbd &mdash;size=$fssize || exit 1
++    rbd map $pool/$rbd || exit 1
++    mkfs -t $fstype $rootdev || exit 1
++    mount -t $fstype $rootdev $rootfs
++fi</p>
+
+<p> if [ ! -z $lxc_template ]; then
+```</p>
+
+<p>If you want to make persistent after reboot, you must add rbd in /etc/ceph/rbdmap and add line in fstab.</p>
+]]></content>
+  </entry>
+  
+</feed>

@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: CRUSHMAP | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/crushmap/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Erasure code on small clusters]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2017/01/27/erasure-code-on-small-clusters/"/>
+    <updated>2017-01-27T16:47:51+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2017/01/27/erasure-code-on-small-clusters</id>
+    <content type="html"><![CDATA[<p>Erasure code is rather designed for clusters with a sufficient size. However if you want to use it with a small amount of hosts you can also adapt the crushmap for a better matching distribution to your need.</p>
+
+<p>Here a first example for distributing data with 1 host OR 2 drive fault tolerance with k=4, m=2 on 3 hosts and more.</p>
+
+<p>```
+rule erasure_ruleset {</p>
+
+<pre><code>ruleset X
+type erasure
+min_size 6
+max_size 6
+step take default
+step choose indep 3 type host
+step choose indep 2 type osd
+step emit
+</code></pre>
+
+<p>}
+```</p>
+
+<!-- more -->
+
+
+<p>Testing it on sample crushmap :</p>
+
+<p>```</p>
+
+<h1>crushtool &mdash;test -i crushmap.bin &mdash;rule 1 &mdash;show-mappings &mdash;x 1 &mdash;num-rep 6</h1>
+
+<p>CRUSH rule 1 x 1 [0,1,8,7,5,3]</p>
+
+<h1>crushtool &mdash;test -i crushmap.bin &mdash;tree</h1>
+
+<p>ID  WEIGHT  TYPE NAME
+-5      4.00000 root default
+-1      1.00000         host host-01
+0       1.00000                 osd.0   &lt;&mdash; DATA
+1       1.00000                 osd.1   &lt;&mdash; DATA
+2       1.00000                 osd.2
+-2      1.00000         host host-02
+3       1.00000                 osd.3   &lt;&mdash; PARITY
+4       1.00000                 osd.4
+5       1.00000                 osd.5   &lt;&mdash; PARITY
+-3      1.00000         host host-03
+6       1.00000                 osd.6
+7       1.00000                 osd.7   &lt;&mdash; DATA
+8       1.00000                 osd.8   &lt;&mdash; DATA
+-4      1.00000         host host-04
+9       1.00000                 osd.9
+10      1.00000                 osd.10
+11      1.00000                 osd.11</p>
+
+<p>```</p>
+
+<p>Here is an other example for distributing data with ( 1 host AND 1 drive ) OR ( 3 drives ) fault tolerance with k=5, m=3 on 4 hosts and more.</p>
+
+<p>```
+rule erasure_ruleset {</p>
+
+<pre><code>ruleset X
+type erasure
+min_size 8
+max_size 8
+step take default
+step choose indep 4 type host
+step choose indep 2 type osd
+step emit
+</code></pre>
+
+<p>}
+```</p>
+
+<p>```</p>
+
+<h1>crushtool &mdash;test -i crushmap.bin &mdash;rule 2 &mdash;show-mappings &mdash;x 1 &mdash;num-rep 8</h1>
+
+<p>CRUSH rule 2 x 1 [0,1,8,7,9,11,5,3]</p>
+
+<h1>crushtool &mdash;test -i crushmap.bin &mdash;tree</h1>
+
+<p>ID      WEIGHT  TYPE NAME
+-5      4.00000 root default
+-1      1.00000         host host-01
+0       1.00000                 osd.0   &lt;&mdash; DATA
+1       1.00000                 osd.1   &lt;&mdash; DATA
+2       1.00000                 osd.2
+-2      1.00000         host host-02
+3       1.00000                 osd.3   &lt;&mdash; PARITY
+4       1.00000                 osd.4
+5       1.00000                 osd.5   &lt;&mdash; PARITY
+-3      1.00000         host host-03
+6       1.00000                 osd.6
+7       1.00000                 osd.7   &lt;&mdash; DATA
+8       1.00000                 osd.8   &lt;&mdash; DATA
+-4      1.00000         host host-04
+9       1.00000                 osd.9   &lt;&mdash; DATA
+10      1.00000                 osd.10
+11      1.00000                 osd.11  &lt;&mdash; PARITY
+```</p>
+
+<p>And a last example for distributing data with ( 1 host AND 2 drives ) OR ( 4 drives ) fault tolerance with k=8, m=4 on 4 hosts and more.
+```
+rule erasure_ruleset {</p>
+
+<pre><code>ruleset X
+type erasure
+min_size 12
+max_size 12
+step take default
+step choose indep 4 type host
+step choose indep 3 type osd
+step emit
+</code></pre>
+
+<p>}
+```</p>
+
+<p>An other possibility is to use LRC Erasure code plugin :</p>
+
+<p><a href="http://docs.ceph.com/docs/master/rados/operations/erasure-code-lrc/">http://docs.ceph.com/docs/master/rados/operations/erasure-code-lrc/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Crushmap for 2 DC]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2017/01/23/crushmap-for-2-dc/"/>
+    <updated>2017-01-23T10:04:14+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2017/01/23/crushmap-for-2-dc</id>
+    <content type="html"><![CDATA[<p>An example of crushmap for 2 Datacenter replication :</p>
+
+<p>```
+rule replicated_ruleset {</p>
+
+<pre><code>ruleset X
+type replicated
+min_size 2
+max_size 3
+step take default
+step choose firstn 2 type datacenter
+step chooseleaf firstn -1 type host
+step emit
+</code></pre>
+
+<p>}
+```
+This working well with pool size=2 (not recommended!) or 3.
+If you set pool size more than 3 (and increase the max_size in crush), be careful : you will have n-1 replica on one side and only one on the other datacenter.</p>
+
+<p>If you want to be able to write data even when one of the datacenters is inaccessible, pool min_size should be set at 1 even if size is set to 3. In this case, pay attention to the monitors location.</p>
+
+<!-- more -->
+
+
+<p>Other posts about crushmap : <a href="http://cephnotes.ksperis.com/blog/categories/crushmap/">http://cephnotes.ksperis.com/blog/categories/crushmap/</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[CRUSHMAP : Example of a hierarchical cluster map]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/02/02/crushmap-example-of-a-hierarchical-cluster-map/"/>
+    <updated>2015-02-02T22:10:43+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/02/02/crushmap-example-of-a-hierarchical-cluster-map</id>
+    <content type="html"><![CDATA[<p>It is not always easy to know how to organize your data in the Crushmap, especially when trying to distribute the data geographically while separating different types of discs, eg SATA, SAS and SSD.
+Let&rsquo;s see what we can imagine as Crushmap hierarchy.</p>
+
+<p>Take a simple example of a distribution on two datacenters.
+<img src="/images/crushmap-tree-1.png">
+(Model 1.1)</p>
+
+<!--more-->
+
+
+<p>With the introduction of cache pools we can easily imagine adding ssd drives to our cluster. Take the example of ssd added on new hosts. We then left with two types of disks to manage. In a hierarchy that only describing the physical division of the cluster, we would end up with this type of hierarchy:
+<img src="/images/crushmap-tree-2.png">
+(Model 1.2)</p>
+
+<p>However, we soon realized that this configuration does not allow to separate the types of discs for use in a specific pool.</p>
+
+<p>To separate these discs and organize Crushmap, the simplest method is still to duplicate the tree from the root.
+Thus we get two points entered &ldquo;default&rdquo; (that could be rename &ldquo;hdd&rdquo;) and &ldquo;ssd&rdquo;.
+<img src="/images/crushmap-tree-3.1.png">
+An other example with hdd and ssd mixed on same hardware (you need to split each host) :
+<img src="/images/crushmap-tree-3.2.png">
+(Model 1.3)</p>
+
+<p>The problem is that we have segmented all the cluster by drive type. It was therefore no more entry point into our tree to select any disk in &ldquo;dc-1&rdquo; or in &ldquo;dc-2&rdquo;.
+For example, we can no longer define a rule to store data on a specific data center regardless of the type of disc.</p>
+
+<p>What we can do is add other entry points to the root level. For example, to permit access all drives :
+<img src="/images/crushmap-tree-4.png">
+(Model 1.4)</p>
+
+<p>If we wants to keep a certain logic in the tree, it is also possible to add more levels, some more &ldquo;logical&rdquo; for exemple for disks types, and other that represent physical distribution.
+They can be placed wherever we want and named as we wish. For example, here I added the level &ldquo;pool&rdquo; that one could also have called &ldquo;type&rdquo; or otherwise.
+<img src="/images/crushmap-tree-5.1.png">
+<img src="/images/crushmap-tree-5.2.png">
+(Model 1.5)</p>
+
+<p>Ok, it works, but it is difficult to read. Moreover, it becomes unreadable when the SSD and HDD are mixed on the same hosts as it involves duplicating each host.
+Also, there is no more physical data placement logic. We can try to insert a level between HOST and OSD:
+<img src="/images/crushmap-tree-6.png">
+(Model 1.6)</p>
+
+<p>Ok, it may be advantageous in the case of a small cluster, or in the case where there is no need for other levels.
+Let&rsquo;s try something else, we can also try using another organization, such as separating the osd in different levels and use that in the specific rules.
+For examble, have <code>step chooseleaf firstn 5 type host-sata</code> to select sata drive, and <code>step chooseleaf firstn 5 type host-ssd</code> to select ssd drive.
+<img src="/images/crushmap-tree-7.png">
+(Model 1.7)</p>
+
+<p>But this do NOT WORK. Indeed, the algorithm will try to take an OSD in each branch of the tree. If no OSD is found, it will try again to retrace. But this operation is quite random, and you can easily end up with insufficient replications.</p>
+
+<p>Make the test of this with this crushmap :</p>
+
+<ul>
+<li><p>1 rule for select one ssd on each DC</p></li>
+<li><p>1 rule for select one sata on each DC</p></li>
+<li><p>1 rule for select one sata on 2 diffrents hosts</p></li>
+</ul>
+
+
+<p>```</p>
+
+<pre><code># begin crush map
+tunable choose_local_tries 0
+tunable choose_local_fallback_tries 0
+tunable choose_total_tries 50
+tunable chooseleaf_descend_once 0
+tunable chooseleaf_vary_r 0
+
+# devices
+device 0 osd.0
+device 1 osd.1
+device 2 osd.2
+device 3 osd.3
+device 4 osd.4
+device 5 osd.5
+device 6 osd.6
+device 7 osd.7
+device 8 osd.8
+device 9 osd.9
+device 10 osd.10
+device 11 osd.11
+device 12 osd.12
+device 13 osd.13
+device 14 osd.14
+device 15 osd.15
+device 16 osd.16
+device 17 osd.17
+device 18 osd.18
+
+# types
+type 0 osd
+type 1 host-ssd
+type 2 host-sata
+type 3 datacenter
+type 4 root
+
+# buckets
+host-sata host-01 {
+    alg straw
+    hash 0
+    item osd.1 weight 1.000
+    item osd.2 weight 1.000
+    item osd.3 weight 1.000
+}
+host-sata host-02 {
+    alg straw
+    hash 0
+    item osd.4 weight 1.000
+    item osd.5 weight 1.000
+    item osd.6 weight 1.000
+}
+host-sata host-03 {
+    alg straw
+    hash 0
+    item osd.7 weight 1.000
+    item osd.8 weight 1.000
+    item osd.9 weight 1.000
+}
+host-sata host-04 {
+    alg straw
+    hash 0
+    item osd.10 weight 1.000
+    item osd.11 weight 1.000
+    item osd.12 weight 1.000
+}
+
+host-ssd host-05 {
+    alg straw
+    hash 0
+    item osd.13 weight 1.000
+    item osd.14 weight 1.000
+    item osd.15 weight 1.000
+}
+host-ssd host-06 {
+    alg straw
+    hash 0
+    item osd.16 weight 1.000
+    item osd.17 weight 1.000
+    item osd.18 weight 1.000
+}
+
+datacenter dc1 {
+    alg straw
+    hash 0
+    item host-01 weight 1.000
+    item host-02 weight 1.000
+    item host-05 weight 1.000
+}
+datacenter dc2 {
+    alg straw
+    hash 0
+    item host-03 weight 1.000
+    item host-04 weight 1.000
+    item host-06 weight 1.000
+}
+
+root default {
+    alg straw
+    hash 0
+    item dc1 weight 1.000
+    item dc2 weight 1.000
+}
+
+# rules
+
+rule sata-rep_2dc {
+    ruleset 0
+    type replicated
+    min_size 2
+    max_size 2
+    step take default
+    step choose firstn 0 type datacenter
+    step chooseleaf firstn 1 type host-sata
+    step emit
+}
+
+rule ssd-rep_2dc {
+    ruleset 1
+    type replicated
+    min_size 2
+    max_size 2
+    step take default
+    step choose firstn 0 type datacenter
+    step chooseleaf firstn 1 type host-ssd
+    step emit
+}
+
+rule sata-all {
+    ruleset 2
+    type replicated
+    min_size 2
+    max_size 2
+    step take default
+    step chooseleaf firstn 0 type host-sata
+    step emit
+}
+
+
+# end crush map
+</code></pre>
+
+<p>```</p>
+
+<p>To test the placement, we can use those commands :</p>
+
+<pre><code>crushtool -c crushmap.txt -o crushmap-new.bin
+crushtool --test -i crushmap-new.bin --show-utilization --rule 0 --num-rep=2
+crushtool --test -i crushmap-new.bin --show-choose-tries --rule 0 --num-rep=2
+</code></pre>
+
+<p>Check the utilization :</p>
+
+<pre><code>$ crushtool --test -i crushmap-new.bin --show-utilization  --num-rep=2 | grep ^rule
+rule 0 (sata-rep_2dc), x = 0..1023, numrep = 2..2
+rule 0 (sata-rep_2dc) num_rep 2 result size == 0:   117/1024
+rule 0 (sata-rep_2dc) num_rep 2 result size == 1:   448/1024
+rule 0 (sata-rep_2dc) num_rep 2 result size == 2:   459/1024
+rule 1 (ssd-rep_2dc), x = 0..1023, numrep = 2..2
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 0:    459/1024
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 1:    448/1024
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 2:    117/1024
+rule 2 (sata-all), x = 0..1023, numrep = 2..2
+rule 2 (sata-all) num_rep 2 result size == 0:   113/1024
+rule 2 (sata-all) num_rep 2 result size == 1:   519/1024
+rule 2 (sata-all) num_rep 2 result size == 2:   392/1024
+</code></pre>
+
+<p>For all the rules, the number of replication is insufficient for a part of the sample. Particularly for drives in a minor amount (in that case ssd).
+Looking at the number of retry to chooose an osd, we see that it will be useless to increase the &ldquo;choose_total_tries&rdquo; which is sufficient :</p>
+
+<pre><code>$ crushtool --test -i crushmap-new.bin --show-choose-tries --rule 0 --num-rep=2
+ 0:      4298
+ 1:       226
+ 2:       130
+ 3:        59
+ 4:        38
+ 5:        11
+ 6:        10
+ 7:         3
+ 8:         0
+ 9:         2
+10:         1
+11:         0
+12:         2
+
+$ crushtool --test -i crushmap-new.bin --show-choose-tries --rule 1 --num-rep=2
+ 0:      2930
+ 1:       226
+ 2:       130
+ 3:        59
+ 4:        38
+ 5:        11
+ 6:        10
+ 7:         3
+ 8:         0
+ 9:         2
+10:         1
+11:         0
+12:         2
+
+$ crushtool --test -i crushmap-new.bin --show-choose-tries --rule 2 --num-rep=2
+ 0:      2542
+ 1:        52
+ 2:        12
+</code></pre>
+
+<p>We can test to increase the number of osd for testing (It&rsquo;s not very pretty&hellip;) :</p>
+
+<p>in sata-rep_2dc : <code>step chooseleaf firstn 5 type host-sata</code></p>
+
+<p>in ssd-rep_2dc : <code>step chooseleaf firstn 5 type host-ssd</code></p>
+
+<p>in sata-all : <code>step chooseleaf firstn 15 type host-sata</code></p>
+
+<pre><code>$ crushtool --test -i crushmap-new.bin --show-utilization  --num-rep=2 | grep ^rule
+rule 0 (sata-rep_2dc), x = 0..1023, numrep = 2..2
+rule 0 (sata-rep_2dc) num_rep 2 result size == 1:   1/1024
+rule 0 (sata-rep_2dc) num_rep 2 result size == 2:   1023/1024
+rule 1 (ssd-rep_2dc), x = 0..1023, numrep = 2..2
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 0:    20/1024
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 1:    247/1024
+rule 1 (ssd-rep_2dc) num_rep 2 result size == 2:    757/1024
+rule 2 (sata-all), x = 0..1023, numrep = 2..2
+rule 2 (sata-all) num_rep 2 result size == 2:   1024/1024
+</code></pre>
+
+<p>It&rsquo;s better, we see that for the rule &ldquo;sata-all&rdquo; it works pretty well, by cons, when there are fewer disk, the number of replications is always not correct.
+The idea of this distribution was attractive, but quickly realizes that this can not work.</p>
+
+<p>If people have explored this way, or have examples of advanced CRUSHMAP, I encourage you to share them. I&rsquo;m curious of all that can be done with this. Meanwhile, the best is yet to make it simple to suit your needs. In most cases, the 1.3 model will be perfect.</p>
+
+<p>More details on CRUSH algorithm :
+<a href="http://ceph.com/papers/weil-crush-sc06.pdf">http://ceph.com/papers/weil-crush-sc06.pdf</a></p>
+]]></content>
+  </entry>
+  
+</feed>

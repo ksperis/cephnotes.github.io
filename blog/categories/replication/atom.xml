@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Replication | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/replication/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[RBD Replication]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2014/08/12/rbd-replication/"/>
+    <updated>2014-08-12T09:33:43+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2014/08/12/rbd-replication</id>
+    <content type="html"><![CDATA[<p>A simple exemple to make Replication for RBD.</p>
+
+<!-- more -->
+
+
+<p>Based on this post from scuttlemonkey : <a href="http://ceph.com/dev-notes/incremental-snapshots-with-rbd/,">http://ceph.com/dev-notes/incremental-snapshots-with-rbd/,</a> here is a sample script to synchronize rbd image on a remote cluster (eg for backups).
+In the example below, the sync is made to an &ldquo;archive&rdquo; pool on the same cluster.
+(For remote host, you need to use ssh key.)</p>
+
+<p>``` bash</p>
+
+<h1>!/bin/bash</h1>
+
+<p>pool=&lsquo;rbd&rsquo;
+pooldest=&lsquo;archive&rsquo;
+rbd=&ldquo;myrbd&rdquo;
+destination_host=&ldquo;127.0.0.1&rdquo;
+snapname=&lsquo;rbd-sync-&rsquo;</p>
+
+<h1>Retreive last synced id</h1>
+
+<p>expr=&ldquo; $snapname([[:digit:]]+)&rdquo;
+if rbd info $pool/$rbd >/dev/null 2>&1; then</p>
+
+<pre><code>    rbd snap ls $pool/$rbd | grep "$expr" | sed  "s/.*$expr.*/\1/g" | sort -n &gt; /tmp/rbd-sync-snaplistlocal
+</code></pre>
+
+<p>else</p>
+
+<pre><code>    echo "no image $pool/$rbd"
+    return
+</code></pre>
+
+<p>fi
+if ssh $destination_host rbd info $pooldest/$rbd >/dev/null 2>&1; then</p>
+
+<pre><code>    ssh $destination_host rbd snap ls $pooldest/$rbd | grep "$expr" | sed "s/.*$expr.*/\1/g" | sort -n &gt; /tmp/rbd-sync-snaplistremote
+</code></pre>
+
+<p>else</p>
+
+<pre><code>    echo "" &gt; /tmp/rbd-sync-snaplistremote
+</code></pre>
+
+<p>fi
+syncid=$(comm -12 /tmp/rbd-sync-snaplistlocal /tmp/rbd-sync-snaplistremote | tail -n1)
+lastid=$(cat /tmp/rbd-sync-snaplistlocal /tmp/rbd-sync-snaplistremote | sort -n | tail -n1)
+nextid=$(($lastid + 1))</p>
+
+<h1>Initial sync</h1>
+
+<p>if [ &ldquo;$syncid&rdquo; = &ldquo;&rdquo; ]; then</p>
+
+<pre><code>    echo "Initial sync with id $nextid"
+    rbd snap create $pool/$rbd@$snapname$nextid
+    rbd export --no-progress $pool/$rbd@$snapname$nextid - \
+    | ssh $destination_host rbd import --image-format 2 - $pooldest/$rbd
+    ssh $destination_host rbd snap create $pooldest/$rbd@$snapname$nextid
+</code></pre>
+
+<h1>Incremental sync</h1>
+
+<p>else</p>
+
+<pre><code>    echo "Found synced id : $syncid"
+    rbd snap create $pool/$rbd@$snapname$nextid
+
+    echo "Sync $syncid -&gt; $nextid"
+
+    rbd export-diff --no-progress --from-snap $snapname$syncid $pool/$rbd@$snapname$nextid - \
+    | ssh $destination_host rbd import-diff - $pooldest/$rbd
+</code></pre>
+
+<p>fi
+```</p>
+
+<p>An other exemple : <a href="https://www.rapide.nl/blog/item/ceph_-_rbd_replication">https://www.rapide.nl/blog/item/ceph_-_rbd_replication</a></p>
+]]></content>
+  </entry>
+  
+</feed>

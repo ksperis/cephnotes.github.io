@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: OpenVZ | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/openvz/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[OpenVZ: kernel 3.10 with rbd module]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/05/04/openvz-kernel-3-dot-10-with-rbd-module/"/>
+    <updated>2015-05-04T12:06:19+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/05/04/openvz-kernel-3-dot-10-with-rbd-module</id>
+    <content type="html"><![CDATA[<p>3.X Kernel for OpenVZ is out and it is compiled with rbd module:</p>
+
+<pre><code>root@debian:~# uname -a
+Linux debian 3.10.0-3-pve #1 SMP Thu Jun 12 13:50:49 CEST 2014 x86_64 GNU/Linux
+
+root@debian:~# modinfo rbd
+filename:       /lib/modules/3.10.0-3-pve/kernel/drivers/block/rbd.ko
+license:        GPL
+author:         Jeff Garzik &lt;jeff@garzik.org&gt;
+description:    rados block device
+author:         Yehuda Sadeh &lt;yehuda@hq.newdream.net&gt;
+author:         Sage Weil &lt;sage@newdream.net&gt;
+srcversion:     F459625E3E9943C5880D8BE
+depends:        libceph
+intree:         Y
+vermagic:       3.10.0-3-pve SMP mod_unload modversions 
+</code></pre>
+
+<p>There will be new things to test &hellip;</p>
+
+<p>By default, no CephFS module.</p>
+
+<p>The announcement of the publication of the source code :
+<a href="http://lists.openvz.org/pipermail/announce/2015-April/000579.html">http://lists.openvz.org/pipermail/announce/2015-April/000579.html</a></p>
+]]></content>
+  </entry>
+  
+</feed>

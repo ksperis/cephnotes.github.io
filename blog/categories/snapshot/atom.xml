@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Snapshot | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/snapshot/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Remove snapshot before rbd]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2013/07/30/remove-snapshot-before-rbd/"/>
+    <updated>2013-07-30T23:28:00+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2013/07/30/remove-snapshot-before-rbd</id>
+    <content type="html"><![CDATA[<p>```
+$ rbd rm rbd/myrbd
+2013-07-30 14:10:13.341184 7f9e11922760 -1 librbd: image has snapshots &ndash; not removing
+Removing image: 0% complete&hellip;failed.
+rbd: image has snapshots &ndash; these must be deleted with &lsquo;rbd snap purge&rsquo; before the image can be removed.
+$ rbd snap ls rbd/myrbd
+SNAPID NAME       SIZE</p>
+
+<pre><code>10 snap1 102400 KB 
+12 snap2 102400 KB 
+</code></pre>
+
+<p>$ rbd snap purge rbd/myrbd
+Removing all snapshots: 100% complete&hellip;done.
+$ rbd rm rbd/myrbd
+Removing image: 100% complete&hellip;done.
+```</p>
+]]></content>
+  </entry>
+  
+</feed>

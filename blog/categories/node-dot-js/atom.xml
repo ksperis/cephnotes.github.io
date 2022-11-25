@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Node.js | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/node-dot-js/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Ceph Node.js bindings for librados]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2014/08/25/ceph-node-dot-js-bindings-for-librados/"/>
+    <updated>2014-08-25T09:57:01+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2014/08/25/ceph-node-dot-js-bindings-for-librados</id>
+    <content type="html"><![CDATA[<p>```js
+var cluster = new rados.Rados( &ldquo;ceph&rdquo;, &ldquo;client.admin&rdquo;, &ldquo;/etc/ceph/ceph.conf&rdquo;);
+cluster.connect();</p>
+
+<p>var ioctx = new rados.Ioctx(cluster, &ldquo;data&rdquo;);
+ioctx.aio_write(&ldquo;testfile2&rdquo;, new Buffer(&ldquo;1234567879ABCD&rdquo;), 14, 0, function (err) {</p>
+
+<pre><code>if (err) {
+  throw err;
+}
+...
+</code></pre>
+
+<p>```</p>
+
+<!-- more -->
+
+
+<p>To my knowledge, there is not yet any wrapper Node.js for librados. (I guess that Alexandre has not found again the code it had begun. <a href="http://tracker.ceph.com/issues/4230">http://tracker.ceph.com/issues/4230</a>). So, I started to make a draft of a plugin (when I have some time). For now I am not using it, but it allows me to discover Node. If people are interested this is here :</p>
+
+<p><a href="https://github.com/ksperis/node-rados">https://github.com/ksperis/node-rados</a></p>
+
+<p>(suggestions are welcome, especially on the Error Handling, the use of libuv, buffers / strings, and everything else&hellip;)</p>
+
+<p>All is not yet implemented, but the basic functions are present.</p>
+
+<p>For example (example.js file in repo):</p>
+
+<p>```js
+var rados = require(&lsquo;./build/Release/rados&rsquo;);</p>
+
+<p>// EXEMPLE FILE</p>
+
+<p>//==================================
+//     Connect to cluster
+//==================================
+var cluster = new rados.Rados( &ldquo;ceph&rdquo;, &ldquo;client.admin&rdquo;, &ldquo;/etc/ceph/ceph.conf&rdquo;);</p>
+
+<p>var err = cluster.connect();
+if (err) {</p>
+
+<pre><code>// On connection error
+console.log("Error " + err);
+throw err;
+</code></pre>
+
+<p>}</p>
+
+<p>// Print cluster FSID, pools
+console.log( &ldquo;fsid : &rdquo; + cluster.get_fsid() );
+console.log( &ldquo;ls pools : &rdquo; + cluster.pool_list() );</p>
+
+<p>//==================================
+//     Create IOCTX
+//==================================
+var ioctx = new rados.Ioctx(cluster, &ldquo;data&rdquo;);</p>
+
+<p>console.log(&ldquo; &mdash;&ndash; RUN Sync Write / Read &mdash;&ndash; &rdquo;);
+// Sync write_full
+ioctx.write_full(&ldquo;testfile1&rdquo;, new Buffer(&ldquo;01234567ABCDEF&rdquo;));</p>
+
+<p>// Sync Read
+console.log( &ldquo;Read data : &rdquo; +</p>
+
+<pre><code>ioctx.read("testfile1", ioctx.stat("testfile1").psize).toString() );
+</code></pre>
+
+<p>// Remove
+ioctx.remove(&ldquo;testfile1&rdquo;);</p>
+
+<p>console.log(&ldquo; &mdash;&ndash; RUN ASync Write / Read &mdash;&ndash; &rdquo;);
+// ASync write_full
+ioctx.aio_write(&ldquo;testfile2&rdquo;, new Buffer(&ldquo;1234567879ABCD&rdquo;), 14, 0, function (err) {</p>
+
+<pre><code>if (err) {
+  throw err;
+}
+
+ioctx.aio_read("testfile2", 14, 0, function (err, data) {
+if (err) {
+  throw err;
+}
+
+ console.log("[async callback] data = " + data.toString());
+
+});
+</code></pre>
+
+<p>});</p>
+
+<p>//==================================
+//     Read / Write Attributes
+//==================================</p>
+
+<p>console.log(&ldquo; &mdash;&ndash; RUN Attributes Write / Read &mdash;&ndash; &rdquo;);</p>
+
+<p>ioctx.setxattr(&ldquo;testfile3&rdquo;, &ldquo;attr1&rdquo;, &ldquo;first attr&rdquo;);
+ioctx.setxattr(&ldquo;testfile3&rdquo;, &ldquo;attr2&rdquo;, &ldquo;second attr&rdquo;);
+ioctx.setxattr(&ldquo;testfile3&rdquo;, &ldquo;attr3&rdquo;, &ldquo;last attr value&rdquo;);</p>
+
+<p>var attrs = ioctx.getxattrs(&ldquo;testfile3&rdquo;);</p>
+
+<p>console.log(&ldquo;testfile3 xattr = %j&rdquo;, attrs);</p>
+
+<p>// destroy ioctx and close cluster after aio_flush
+ioctx.aio_flush_async(function (err) {</p>
+
+<pre><code>ioctx.destroy();
+cluster.shutdown();
+</code></pre>
+
+<p>});</p>
+
+<p>process.exit(code=0)</p>
+
+<p>// OTHER EXEMPLES</p>
+
+<p>//   Read Sync file in chunks
+var file = &ldquo;testfile&rdquo;;
+var fileSize = ioctx.stat(file).psize,</p>
+
+<pre><code>chunkSize = 512,
+bytesRead = 0;
+</code></pre>
+
+<p>while (bytesRead &lt; fileSize) {</p>
+
+<pre><code>if ((bytesRead + chunkSize) &gt; fileSize) {
+    chunkSize = (fileSize - bytesRead);
+}
+var buffer = ioctx.read(file, chunkSize, bytesRead);
+bytesRead += chunkSize;
+process.stdout.write(buffer.toString());
+</code></pre>
+
+<p>}</p>
+
+<p>//   Read Async file in chunks
+var file = &ldquo;testfile&rdquo;;
+var fileSize = ioctx.stat(file).psize,</p>
+
+<pre><code>chunkSize = 512,
+bytesRead = 0;
+</code></pre>
+
+<p>while (bytesRead &lt; fileSize) {</p>
+
+<pre><code>if ((bytesRead + chunkSize) &gt; fileSize) {
+    chunkSize = (fileSize - bytesRead);
+}
+ioctx.aio_read(file, chunkSize, bytesRead, function (err, data) {
+    process.stdout.write(data.toString());
+});
+bytesRead += chunkSize;
+</code></pre>
+
+<p>}</p>
+
+<p>//   Use snapshot
+ioctx.write_full(&ldquo;testfile10&rdquo;, new Buffer(&ldquo;version1&rdquo;));
+ioctx.snap_create(&ldquo;snaptest1&rdquo;);
+ioctx.write_full(&ldquo;testfile10&rdquo;, new Buffer(&ldquo;version2&rdquo;));
+ioctx.snap_create(&ldquo;snaptest2&rdquo;);
+ioctx.write_full(&ldquo;testfile10&rdquo;, new Buffer(&ldquo;version3&rdquo;));
+ioctx.snap_create(&ldquo;snaptest3&rdquo;);</p>
+
+<p>ioctx.snap_rollback(&ldquo;testfile10&rdquo;, &ldquo;snaptest2&rdquo;);
+console.log(ioctx.read(&ldquo;testfile10&rdquo;).toString());</p>
+
+<p>ioctx.snap_remove(&ldquo;snaptest1&rdquo;);
+ioctx.snap_remove(&ldquo;snaptest2&rdquo;);
+ioctx.snap_remove(&ldquo;snaptest3&rdquo;);
+```</p>
+]]></content>
+  </entry>
+  
+</feed>

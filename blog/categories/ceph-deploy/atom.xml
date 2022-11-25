@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: ceph-deploy | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/ceph-deploy/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Using ceph-deploy]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2013/07/30/using-ceph-deploy/"/>
+    <updated>2013-07-30T23:25:00+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2013/07/30/using-ceph-deploy</id>
+    <content type="html"><![CDATA[<h2>Install the ceph cluster</h2>
+
+<h3>On each node :</h3>
+
+<p>create a user &ldquo;ceph&rdquo; and configure sudo for nopassword :</p>
+
+<p><code>
+$ useradd -d /home/ceph -m ceph
+$ passwd ceph
+$ echo "ceph ALL = (root) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/ceph
+$ chmod 0440 /etc/sudoers.d/ceph
+</code></p>
+
+<p>Update hosts file
+<code>
+$ vim /etc/hosts
+192.168.0.100       cephnode-01 cephnode-01.local
+192.168.0.101       cephnode-02 cephnode-02.local
+192.168.0.102       cephnode-03 cephnode-03.local
+192.168.0.103       cephnode-04 cephnode-04.local
+192.168.0.104       cephnode-05 cephnode-05.local
+</code></p>
+
+<h3>On admin server</h3>
+
+<p>(for me on cephnode-01)</p>
+
+<p><code>
+$ ssh-keygen
+</code></p>
+
+<p>Deploy the key on each node</p>
+
+<p>```
+$ cluster=&ldquo;cephnode-01 cephnode-02 cephnode-03 cephnode-04 cephnode-05&rdquo;
+$ for i in $cluster; do</p>
+
+<pre><code>ssh-copy-id ceph@$i
+</code></pre>
+
+<p>  done
+```</p>
+
+<p>Add option on ssh config to connect with ceph user :</p>
+
+<p><code>
+$ vim /root/.ssh/config
+Host ceph*
+User ceph
+</code></p>
+
+<p>Install ceph-deploy (Dumpling Version)</p>
+
+<p><code>
+$ wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
+$ echo deb http://ceph.com/debian-dumpling/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
+$ apt-get update
+$ apt-get install python-pkg-resources python-setuptools ceph-deploy
+</code></p>
+
+<!-- more -->
+
+
+<p>Install ceph on the cluster :</p>
+
+<p>Before you need to create partition on ssd device (if use seperate journal)</p>
+
+<p>For my exemple, I use :</p>
+
+<pre><code>sda 1: system partition
+    2: swap
+    5: osd journal (10 GB)
+    6: osd journal (10 GB)
+    7: osd journal (10 GB)
+sdb  : osd
+sdc  : osd
+sdd  : osd
+</code></pre>
+
+<p>```
+$ mkdir ceph-deploy; cd ceph-deploy
+$ ceph-deploy install $cluster
+$ ceph-deploy new cephnode-01 cephnode-02 cephnode-03
+$ ceph-deploy &mdash;overwrite-conf mon create cephnode-01 cephnode-02 cephnode-03
+$ ceph-deploy gatherkeys cephnode-01
+$ ceph-deploy osd create \</p>
+
+<pre><code>cephnode-01:/dev/sdb:/dev/sda5 \
+cephnode-01:/dev/sdc:/dev/sda6 \
+cephnode-01:/dev/sdd:/dev/sda7 \
+cephnode-02:/dev/sdb:/dev/sda5 \
+cephnode-02:/dev/sdc:/dev/sda6 \
+cephnode-02:/dev/sdd:/dev/sda7 \
+cephnode-03:/dev/sdb:/dev/sda5 \
+cephnode-03:/dev/sdc:/dev/sda6 \
+cephnode-03:/dev/sdd:/dev/sda7 \
+cephnode-04:/dev/sdb:/dev/sda5 \
+cephnode-04:/dev/sdc:/dev/sda6 \
+cephnode-04:/dev/sdd:/dev/sda7 \
+cephnode-05:/dev/sdb:/dev/sda5 \
+cephnode-05:/dev/sdc:/dev/sda6 \
+cephnode-05:/dev/sdd:/dev/sda7
+</code></pre>
+
+<p>```</p>
+
+<h2>Destroy cluster and remove all data</h2>
+
+<p>```
+$ ceph-deploy purgedata $cluster
+$ ceph-deploy purge $cluster</p>
+
+<p>$ for host in $cluster
+  do</p>
+
+<pre><code>ssh $host &lt;&lt;EOF
+  sudo dd if=/dev/zero of=/dev/sdb bs=1M count=100
+  sudo dd if=/dev/zero of=/dev/sdc bs=1M count=100
+  sudo dd if=/dev/zero of=/dev/sdd bs=1M count=100
+  sudo sgdisk -g --clear /dev/sdb
+  sudo sgdisk -g --clear /dev/sdc
+  sudo sgdisk -g --clear /dev/sdd
+EOF
+</code></pre>
+
+<p>  done
+```</p>
+]]></content>
+  </entry>
+  
+</feed>

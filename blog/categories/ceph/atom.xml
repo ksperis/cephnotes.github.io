@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: ceph | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/ceph/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Ceph Pool Migration]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/04/15/ceph-pool-migration/"/>
+    <updated>2015-04-15T16:23:59+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/04/15/ceph-pool-migration</id>
+    <content type="html"><![CDATA[<p>You have probably already be faced to migrate all objects from a pool to another, especially to change parameters that can not be modified on pool. For example, to migrate from a replicated pool to an EC pool, change EC profile, or to reduce the number of PGs&hellip;
+There are different methods, depending on the contents of the pool (RBD, objects), size&hellip;</p>
+
+<h1>The simple way</h1>
+
+<p>The simplest and safest method to copy all objects with the &ldquo;rados cppool&rdquo; command.
+However, it need to have read only access to the pool during the copy.</p>
+
+<p>For example for migrating to an EC pool :</p>
+
+<p><code>bash
+pool=testpool
+ceph osd pool create $pool.new 4096 4096 erasure default
+rados cppool $pool $pool.new
+ceph osd pool rename $pool $pool.old
+ceph osd pool rename $pool.new $pool
+</code></p>
+
+<p>But it does not work in all cases. For example with EC pools : &ldquo;error copying pool testpool => newpool: (95) Operation not supported&rdquo;.</p>
+
+<h1>Using Cache Tier</h1>
+
+<p><strong>This must to be used with caution, make tests before using it on a cluster in production. It worked for my needs, but I can not say that it works in all cases.</strong></p>
+
+<p>I find this method interesting method, because it allows transparent operation, reduce downtime and avoid to duplicate all data. The principle is simple: use the cache tier, but in reverse order.</p>
+
+<p>At the begning, we have 2 pools : the current &ldquo;testpool&rdquo;, and the new one &ldquo;newpool&rdquo;</p>
+
+<p><img src="/images/pool_migration-1.png"></p>
+
+<h2>Setup cache tier</h2>
+
+<p>Configure the existing pool as cache pool :</p>
+
+<p><code>bash
+ceph osd tier add newpool testpool --force-nonempty
+ceph osd tier cache-mode testpool forward
+</code></p>
+
+<p>In <code>ceph osd dump</code> you should see something like that :</p>
+
+<pre><code>--&gt; pool 58 'testpool' replicated size 3 .... tier_of 80 
+</code></pre>
+
+<p>Now, all new objects will be create on new pool :</p>
+
+<p><img src="/images/pool_migration-2.png"></p>
+
+<p>Now we can force to move all objects to new pool :</p>
+
+<p><code>bash
+rados -p testpool cache-flush-evict-all
+</code></p>
+
+<p><img src="/images/pool_migration-3.png"></p>
+
+<h2>Switch all clients to the new pool</h2>
+
+<p>(You can also do this step earlier. For example, just after the cache pool creation.)
+Until all the data has not been flushed to the new pool you need to specify an overlay to search objects on old pool :</p>
+
+<p><code>bash
+ceph osd tier set-overlay newpool testpool
+</code></p>
+
+<p>In <code>ceph osd dump</code> you should see something like that :</p>
+
+<pre><code>--&gt; pool 80 'newpool' replicated size 3 .... tiers 58 read_tier 58 write_tier 58
+</code></pre>
+
+<p>With overlay, all operation will be forwarded to the old testpool :</p>
+
+<p><img src="/images/pool_migration-4.png"></p>
+
+<p>Now you can switch all the clients to access objects on the new pool.</p>
+
+<h2>Finish</h2>
+
+<p>When all data is migrate, you can remove overlay and old &ldquo;cache&rdquo; pool :</p>
+
+<p><code>bash
+ceph osd tier remove-overlay newpool
+ceph osd tier remove newpool testpool
+</code></p>
+
+<p><img src="/images/pool_migration-5.png"></p>
+
+<!-- more -->
+
+
+<h2>In-use object</h2>
+
+<p>During eviction you can find some error :</p>
+
+<pre><code>....
+rb.0.59189e.2ae8944a.000000000001   
+rb.0.59189e.2ae8944a.000000000023   
+rb.0.59189e.2ae8944a.000000000006   
+testrbd.rbd 
+failed to evict testrbd.rbd: (16) Device or resource busy
+rb.0.59189e.2ae8944a.000000000000   
+rb.0.59189e.2ae8944a.000000000026   
+...
+</code></pre>
+
+<p>List watcher on object can help :</p>
+
+<p><code>bash
+rados -p testpool listwatchers testrbd.rbd
+watcher=10.20.6.39:0/3318181122 client.5520194 cookie=1
+</code></p>
+
+<h1>Using Rados Export/Import</h1>
+
+<p>For this, you need to use a temporary local directory.</p>
+
+<p>```bash
+rados export &mdash;create testpool tmp_dir
+[exported]     rb.0.4975.2ae8944a.000000002391
+[exported]     rb.0.4975.2ae8944a.000000004abc
+[exported]     rb.0.4975.2ae8944a.0000000018ce
+&hellip;</p>
+
+<p>rados import tmp_dir newpool</p>
+
+<h1>Stop All IO</h1>
+
+<h1>And redo a sync of modified objects</h1>
+
+<p>rados export &mdash;workers 5 testpool tmp_dir
+rados import &mdash;workers 5 tmp_dir newpool
+```</p>
+]]></content>
+  </entry>
+  
+</feed>

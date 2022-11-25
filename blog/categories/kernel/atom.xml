@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Kernel | CephNotes]]></title>
+  <link href="http://cephnotes.ksperis.com/blog/categories/kernel/atom.xml" rel="self"/>
+  <link href="http://cephnotes.ksperis.com/"/>
+  <updated>2017-10-03T12:34:10+02:00</updated>
+  <id>http://cephnotes.ksperis.com/</id>
+  <author>
+    <name><![CDATA[Laurent Barbe]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[OpenVZ: kernel 3.10 with rbd module]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2015/05/04/openvz-kernel-3-dot-10-with-rbd-module/"/>
+    <updated>2015-05-04T12:06:19+02:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2015/05/04/openvz-kernel-3-dot-10-with-rbd-module</id>
+    <content type="html"><![CDATA[<p>3.X Kernel for OpenVZ is out and it is compiled with rbd module:</p>
+
+<pre><code>root@debian:~# uname -a
+Linux debian 3.10.0-3-pve #1 SMP Thu Jun 12 13:50:49 CEST 2014 x86_64 GNU/Linux
+
+root@debian:~# modinfo rbd
+filename:       /lib/modules/3.10.0-3-pve/kernel/drivers/block/rbd.ko
+license:        GPL
+author:         Jeff Garzik &lt;jeff@garzik.org&gt;
+description:    rados block device
+author:         Yehuda Sadeh &lt;yehuda@hq.newdream.net&gt;
+author:         Sage Weil &lt;sage@newdream.net&gt;
+srcversion:     F459625E3E9943C5880D8BE
+depends:        libceph
+intree:         Y
+vermagic:       3.10.0-3-pve SMP mod_unload modversions 
+</code></pre>
+
+<p>There will be new things to test &hellip;</p>
+
+<p>By default, no CephFS module.</p>
+
+<p>The announcement of the publication of the source code :
+<a href="http://lists.openvz.org/pipermail/announce/2015-April/000579.html">http://lists.openvz.org/pipermail/announce/2015-April/000579.html</a></p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Feature set mismatch error on Ceph kernel client]]></title>
+    <link href="http://cephnotes.ksperis.com/blog/2014/01/21/feature-set-mismatch-error-on-ceph-kernel-client/"/>
+    <updated>2014-01-21T09:40:53+01:00</updated>
+    <id>http://cephnotes.ksperis.com/blog/2014/01/21/feature-set-mismatch-error-on-ceph-kernel-client</id>
+    <content type="html"><![CDATA[<p>Depending on the kernel version you may be missing some features required by the cluster (or vice versa, required by client but not available on the cluster). Hence the errors &ldquo;feature set mismatch&rdquo;.</p>
+
+<!-- more -->
+
+
+<p>Some examples of errors that can be encountered :</p>
+
+<pre><code>mon0 192.168.0.1:6789 feature set mismatch, my XXXXXX &lt; server's XXXXXX, missing 2040000
+</code></pre>
+
+<p>&mdash;> Upgrade kernel client up to 3.9 or set tunables to legacy : <code>ceph osd crush tunables legacy</code></p>
+
+<pre><code>mon0 192.168.0.1:6789 feature set mismatch, my XXXXXX &lt; server's XXXXXX, missing 40000000
+</code></pre>
+
+<p>&mdash;> Upgrade kernel client up to 3.9 or unset hashpspool : <code>ceph osd pool set rbd hashpspool false</code></p>
+
+<pre><code>mon0 192.168.0.1:6789 feature set mismatch, my XXXXXX &lt; server's XXXXXX, missing 800000000
+</code></pre>
+
+<p>&mdash;> Remove cache pool and reload monitors or upgrade kernel client up to 3.14</p>
+
+<pre><code>mon0 192.168.0.1:6789 feature set mismatch, my XXXXXX &lt; server's XXXXXX, missing 1000000000
+</code></pre>
+
+<p>&mdash;> Upgrade kernel client up to 3.14</p>
+
+<pre><code>mon0 192.168.0.1:6789 feature set mismatch, my 4a042a42 &lt; server's 2004a042a42, missing 20000000000
+</code></pre>
+
+<p>&mdash;> Upgrade kernel client up to 3.15 or disable tunable 3 features</p>
+
+<h2>CEPH_FEATURE Table and Kernel Version</h2>
+
+<p>You can find the feature missing in that table :</p>
+
+<p>For exemple, <code>missing 2040000</code> means that CEPH_FEATURE_CRUSH_TUNABLES (40000) and CEPH_FEATURE_CRUSH_TUNABLES2 (2000000) is missing on kernel client.</p>
+
+<p>&lsquo;R&rsquo;:required, &rsquo;S':support, &lsquo;-X-&rsquo; feature is new since this version</p>
+
+<table>
+<thead>
+<tr>
+<th align="left">Feature                              </th>
+<th align="center"> BIT </th>
+<th align="right">          OCT     </th>
+<th align="center">  3.8  </th>
+<th align="center">  3.9  </th>
+<th align="center">  3.10 </th>
+<th align="center">  3.14 </th>
+<th align="center">  3.15 </th>
+<th align="center">  3.18 </th>
+<th align="center">  4.1  </th>
+<th align="center">  4.5  </th>
+<th align="center">  4.6   </th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">CEPH_FEATURE_NOSRCADDR               </td>
+<td align="center">  1  </td>
+<td align="right">               2  </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_SUBSCRIBE2              </td>
+<td align="center">  4  </td>
+<td align="right">              10  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -R-     </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_RECONNECT_SEQ           </td>
+<td align="center">  6  </td>
+<td align="right">              40  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -R-  </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_PGID64                  </td>
+<td align="center">  9  </td>
+<td align="right">             200  </td>
+<td align="center">       </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R    </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_PGPOOL3                 </td>
+<td align="center">  11 </td>
+<td align="right">             800  </td>
+<td align="center">       </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R     </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_OSDENC                  </td>
+<td align="center">  13 </td>
+<td align="right">            2000  </td>
+<td align="center">       </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R   </td>
+<td align="center">   R    </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_CRUSH_TUNABLES          </td>
+<td align="center">  18 </td>
+<td align="right">           40000  </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_MSG_AUTH                </td>
+<td align="center">  23 </td>
+<td align="right">          800000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_CRUSH_TUNABLES2         </td>
+<td align="center">  25 </td>
+<td align="right">         2000000  </td>
+<td align="center">       </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S    </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_REPLY_CREATE_INODE      </td>
+<td align="center">  27 </td>
+<td align="right">         8000000  </td>
+<td align="center">       </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S    </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_OSDHASHPSPOOL           </td>
+<td align="center">  30 </td>
+<td align="right">        40000000  </td>
+<td align="center">       </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_OSD_CACHEPOOL           </td>
+<td align="center">  35 </td>
+<td align="right">       800000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_CRUSH_V2                </td>
+<td align="center">  36 </td>
+<td align="right">      1000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_EXPORT_PEER             </td>
+<td align="center">  37 </td>
+<td align="right">      2000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_OSD_ERASURE_CODES***    </td>
+<td align="center">  38 </td>
+<td align="right">      4000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_OSDMAP_ENC              </td>
+<td align="center">  39 </td>
+<td align="right">      8000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S    </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_CRUSH_TUNABLES3         </td>
+<td align="center">  41 </td>
+<td align="right">     20000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_OSD_PRIMARY_AFFINITY    </td>
+<td align="center">  41*</td>
+<td align="right">     20000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_CRUSH_V4 ****           </td>
+<td align="center">  48 </td>
+<td align="right">   1000000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+<td align="center">   S      </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_CRUSH_TUNABLES5         </td>
+<td align="center">  58 </td>
+<td align="right"> 200000000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S   </td>
+</tr>
+<tr>
+<td align="left">CEPH_FEATURE_NEW_OSDOPREPLY_ENCODING </td>
+<td align="center">  58*</td>
+<td align="right"> 400000000000000  </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">       </td>
+<td align="center">  -S-  </td>
+<td align="center">   S    </td>
+</tr>
+</tbody>
+</table>
+
+
+<p>(*** Note that CEPH_FEATURE_OSD_ERASURE_CODES is no more required for client since firefly)</p>
+
+<p>(**** staw2 : <a href="http://tracker.ceph.com/issues/11364">http://tracker.ceph.com/issues/11364</a>)</p>
+]]></content>
+  </entry>
+  
+</feed>
